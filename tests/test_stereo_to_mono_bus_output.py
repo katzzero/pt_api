@@ -5,7 +5,7 @@ import struct
 import tempfile
 import unittest
 
-from pt_api import ProToolsSession, PTBlock
+from pt_api import ProToolsSession
 from tests.test_anonymous_mono_playlists import snapshot
 from tests.test_get_tracks import block
 from tests.test_track_outputs import routes

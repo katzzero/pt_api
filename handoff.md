@@ -1,4 +1,4 @@
-# Handoff — état au 7 octobre 2026
+# Handoff — état au 11 octobre 2026
 
 Ce document sert à reprendre le développement de `pt_api` sans perdre les connaissances acquises pendant l’audit. Il ne remplace ni la spécification technique ni les tests.
 
@@ -6,7 +6,7 @@ Ce document sert à reprendre le développement de `pt_api` sans perdre les conn
 
 L'utilisateur a mis les tests en pause après réception d'une notification DMCA concernant `ptformat`. Il confirme avoir utilisé ce projet comme référence et inspiration lors du développement initial, sans identification d'une copie ligne par ligne. À sa demande explicite du 7 octobre 2026, la distribution source courante de pt_api passe sous **LGPL-2.1-or-later** : LICENSE contient le texte LGPL 2.1 intégral, COPYING le texte GPL 2 référencé, NOTICE.md les crédits et la notice de modification, et pyproject.toml/le header du module/le README sont harmonisés. Les crédits de ptformat mentionnent Damien Zammit et Robin Gareus avec les copyrights publics 2015-2019. Les anciennes affirmations de développement entièrement indépendant et de licence exclusivement MIT ont été retirées du README. Cette mise à jour ne certifie pas la conformité juridique complète et ne résout pas automatiquement la plainte; aucun audit comparatif détaillé de provenance n'a encore été effectué. Les tags/anciennes distributions ne sont pas réécrits. Ne pas conclure que tout le dépôt est dérivé, ni qu'il est entièrement indépendant, et préserver toute notice tierce supplémentaire identifiée pendant l'audit.
 
-L'utilisateur prévoit un commit intermédiaire et demande une sauvegarde locale complète avant la suite de l'audit. Cette demande remplace, pour ce point de sauvegarde, l'ancienne consigne de ne committer qu'après l'audit complet. L'agent ne réalise aucun commit/push et ne change pas la version. Contrôles avant sauvegarde : 412 tests réussis avec `-W error`, syntaxe Python 3.8 des 40 fichiers Python publiables et diff sans erreurs d'espacement. L'étape 21 ci-dessous reste en attente de validation manuelle Pro Tools; l'audit global et la vérification des licences ne sont pas terminés. Ne pas présenter ce commit intermédiaire comme une nouvelle release entièrement validée. Aucun nettoyage destructif des références ou fixtures locales n'est autorisé par cette demande.
+L'utilisateur prévoit un commit intermédiaire et demande une sauvegarde locale complète avant la suite de l'audit. Cette demande remplace, pour ce point de sauvegarde, l'ancienne consigne de ne committer qu'après l'audit complet. L'agent ne réalise aucun commit/push et ne change pas la version. Contrôles avant sauvegarde : 412 tests réussis avec `-W error`, syntaxe Python 3.8 des 40 fichiers Python publiables et diff sans erreurs d'espacement. À ce point de sauvegarde du 7 octobre, l'étape 21 était en attente de validation manuelle Pro Tools (voir le retour reçu le 8 octobre ci-dessous); l'audit global et la vérification des licences ne sont pas terminés. Ne pas présenter ce commit intermédiaire comme une nouvelle release entièrement validée. Aucun nettoyage destructif des références ou fixtures locales n'est autorisé par cette demande.
 
 La sauvegarde complète précédant le changement de licence est conservée hors dépôt : `Y:\pt_api_backups\pt_api_20261007_130352_audit_checkpoint.zip`, SHA-256 `98766129ef083da107bb8b88fc06094e1190a219599c540fd846c5800562400a`. Ses 1029 fichiers sont vérifiés par hash individuel et incluent .git/fixtures/.env; archive privée, ne pas publier. Elle ne couvre pas les dossiers de test externes au dépôt. La licence utilise la forme de métadonnées PEP 621 compatible setuptools >=61 afin de conserver le support Python 3.8; aucune mise à niveau du backend ou de l'API n'est nécessaire.
 
@@ -14,9 +14,222 @@ Contrôles du changement de licence : textes LICENSE/COPYING identiques aux sour
 
 ## État de reprise
 
-**Reprise courante : étape 21, premier gain statique dans un dictionnaire mixte : sortie API à valider dans Pro Tools. Étapes 19 (gain non partagé) et 20 (clonage partagé) clôturées après validation et contrôle des sauvegardes natives; audit global non terminé.**
-Profils testés des étapes 1 à 7 et 9 à 20 clôturés; étape 8 MXF reportée faute de référence native. Profils UUID modernes, autres géométries et volets de contribution non traités restent hors support.
-412 tests réussis. Version toujours 1.5.2, aucun commit/push. Les sections suivantes
+### Brouillon GitHub v1.6.0 préparé — non publié
+
+L'utilisateur demande un draft de release directement sur GitHub et garde la
+publication à sa main. Brouillon créé et relu : releaseID409855015, tag_name
+v1.6.0, target_commitish=master, draft=true, prerelease=false, published_at=null.
+URL : https://github.com/sebedard-creator/pt_api/releases/tag/untagged-b6d30f2dc6c41676d900
+Notes locales `.github/release-notes/v1.6.0.md` identiques au body distant :
+remerciements JF Viguie/ptformat, capacités, correctifs,638tests et limites.
+Aucun asset de build/corpus privé joint; aucun tagv1.6.0 distant créé à ce stade.
+
+Préparation de version : `pt_api.__version__` et pyproject.toml alignés1.6.0,
+titres architecture/specs et entrée changelog harmonisés, README déjà en1.6.0
+préparée. Aucun changement d'algorithme, commit ou push par l'agent.
+**Avant publication : l'utilisateur doit committer et pousser tous les changements
+audités et les métadonnées vers master, puis vérifier que le tag/release cible
+bien ce commit.** Le brouillon ne met pas les changements locaux sur GitHub.
+Les historiques ci-dessous gardent les versions des checkpoints précédents.
+
+### README refondu pour la préparation de v1.6.0
+
+À la demande du mainteneur, le README anglais est reconstruit : crédit bref
+à ptformat/Damien Zammit/Robin Gareus en tête; nouveautés et correctifs du lot
+audité sous v1.6.0, remerciement chaleureux à JF Viguie (@oudileoudi); descriptif
+concis; tableau regroupant toute la surface publique et ses limites essentielles;
+disclaimer reverse engineering sans documentation officielle du format PTX Avid,
+absence d'affiliation, LGPL et renvoi NOTICE conservés. L'historique détaillé
+reste dans changelog/handoff/specs, pas dans le README. Aucun chemin machine ou
+programme consommateur spécifique. Toutes les méthodes publiques de session,
+timecode et blocs, ainsi que les fonctions publiques de builder/chiffrement,
+sont présentes; liens locaux et structure du tableau vérifiés.
+
+À ce checkpoint de refonte, v1.6.0 était explicitement **en préparation**, pas
+publiée, et pyproject.toml restait1.5.2. La demande suivante de brouillon GitHub
+a ensuite aligné les métadonnées1.6.0 (section précédente); aucun commit/push/
+publication. Le code fonctionnel et le bilan638tests restent inchangés.
+
+### Issue contributeur 1 — quatre apports clôturés sur les profils documentés
+
+L'utilisateur demande tous les points du message initial et du commentaire de
+https://github.com/oudileoudi/pt_api-contrib/issues/1. Commits examinés :
+`532ac211a3d000e58991b127b8a19f022617a0fd` et
+`e971a066168f9e4c7c87147eab7236c0a6a380fc`. Ne pas confondre ce nouveau lot
+avec l'audit de contribution déjà clôturé.
+
+Premier apport, drapeau de population legacy intégré : entrée zéro de 11 octets,
+ID UInt16/nlen UInt32 zéro/flag Boolean +6/ID UInt32 zéro; catalogue compteur
+UInt32 et enfants directs 0x251c type2, catalogue 0x251b type1. Préparation avant
+mutations add/delete; zéro marqueur ->0, au moins un ->1. Absence de catalogue
+optionnel conserve le comportement précédent; ambiguïté/profil inconnu présents
+refusés. Sept tests ont porté la suite à603; une huitième régression couvre
+maintenant le résultat de l'import natif. **990 raises** inchangés par ce retour.
+Version1.5.2 inchangée, pas de commit/push/tag.
+
+Contrôles après réception de l'import : **604 tests locaux réussis avec -W error**,
+syntaxe Python3.8 de58 fichiers, Pyflakes et diff --check propres. Dernier contrôle
+sans fixtures privées au checkpoint précédent :474 exécutés/129 skips sur603;
+le nouveau test natif est également optionnel. Aucun nouveau build de distribution.
+
+**Premier test reçu : import direct du marqueur sans ouvrir/sauvegarder la
+source API avant import.** Consignes et audit
+des quatre points dans `Y:\SHARE TO NETWORK\pt_api_debug_contrib\33_issue_1_markers`.
+Sortie `00_api_import_test/api_marker_import_legacy.ptx`, SHA
+`274c182673c9b3e92ec0e7efb09d30c7e69791e4bd5e1f7b4ee13ca915c68187`, base native
+PCM24 resauvegardée48k/enum09, marqueurAPI_IMPORT_TEST à10:00:10:00.
+Destination reçue `imported.ptx` à la racine du dossier33 : 168376 octets,
+SHA-256 `762ee0a44621be0f6e7716a1d40768096e8e7e2f37635df32f4e01aea4150685`.
+48k/enum09, index1, nom API_IMPORT_TEST, TC10:00:10:00; deux timestamps
+1730208480 samples, population règle0 à1. Source API toujours au hash ci-dessus.
+La destination n'a aucune piste Audio : inutile de refaire cet import; la
+lecture des marqueurs n'exige pas de piste. La sauvegarde native normalise le
+marqueur en brut201, zéro0x2506, deux0x4826, un0x4827, assignment brut8.
+Deux cycles API byte-identiques, 159 records TOC standards validés. Fixture
+ignorée `native_marker_direct_import.ptx`, test optionnel conservant ces faits.
+Ce retour ne constitue pas une validation du writer moderne à deux propriétés,
+des commentaires, ni une confirmation explicite de réouverture manuelle.
+Les oracles de suppression du drapeau sont à25fps, pas23.976 : utiliser le moteur
+de timecode de la vraie base, pas une constante samples déduite d'une autre cadence.
+
+**Paire de commentaires reçue**, dossier
+`Y:\SHARE TO NETWORK\pt_api_debug_contrib\34_marker_comments`, consignes
+`A_LIRE.md`. `01_before/marker_comments_before.ptx`,170993 octets/SHA
+`ed0a513baf6f5b92d583cb6c967fe083cc956d8cd95e3050ee734770a7bf41b6`;
+`02_after/marker_comments_after..ptx` (double point conservé),171103/SHA
+`4ec0700e7c2bc4fac113e016d538e87e5eee1b932d7790c1b22dffaf32380cab`.
+48k/enum09, Audio1, même marker index1/nom/TC/timestamps1730208480; commentaire
+vide puis `Commentaire API — café, été, façade.` (42 octets UTF-8).
+La préparation d'Audio a ramené le marker au profil à un0x2506. Deux copies
+corroborées : primaire longueur à26+N+**60**, secondaire longueur+4/texte+8,
+bruts151->193 et51->93; primaire hors champ exact, secondaire hors champ exact
+sauf UUID. Des changements opaques de save existent ailleurs, pas transposés.
+
+Adaptation intégrée : add_marker(comment=None) encode/valide puis prépare les
+deux champs sur le prototype legacy inchangé hors insertion; UUID à23+C.
+Lecture opt-in get_markers(..., *, include_comments=False), Boolean strict,
+schéma/copies/bounds/UTF-8 stricts, pas de fallback vide/cutoffUInt16. Par défaut
+les anciens dictionnaires restent exacts. Les formes compactes/deux propriétés
+et les ranges refusent l'opt-in; suppression commentée non élargie.
+Treize nouveaux tests (11 synthétiques/2 natifs), **617 -W error**,
+59 fichiers Python3.8/Pyflakes propres, **997 raises** (840ValueError/92TypeError).
+Fixtures natives ignorées, sources intactes. Reconstruction du marker natif
+exacte sauf UUID; deux cycles par oracle et candidat. Version/licence inchangées.
+
+**Candidat validé maintenant**,
+`34_marker_comments/output/api_marker_comment_legacy.ptx`,171383 octets/SHA
+`3404296928781106969a5b59cf456806d4b1fc4e8d36b23a8916e4f6089e5707`.
+Marker original inchangé; nouveau API_COMMENT_TEST,index2,10:00:20:00,
+1730688960samples, commentaire Unicode exact. Consignes VALIDATION_API.md :
+ouvrir, vérifier texte/nom/TC des deux points, sauvegarder la sortie, fermer et
+rouvrir. Retour utilisateur « all good! » reçu. Fichier native resauvegardé
+171393 octets/SHA `7130bcbef15641ed044b3cca092f088c35e4429150b17d551aff8e453ad3eb19`.
+Audio1/48k/enum09 et les deux points/positions/texte exacts; un0x2506 chacun,
+primaire du nouveau marker194 (N=16,C=42), secondaire93. Deux cycles API exacts.
+Fixture ignorée `native_marker_comment_pt_resaved.ptx`, quatorzième test de
+commentaires, suite**618 -W error**;59 fichiers Python3.8/Pyflakes propres,
+997 raises inchangés. Aucun changement fonctionnel supplémentaire pour ce retour.
+
+**Comparaison de nommage AAF reçue**, dossier
+`Y:\SHARE TO NETWORK\pt_api_debug_contrib\35_anonymous_playlist_names/A_LIRE.md`.
+Before/after déjà copiés avec leurs deux WAV depuis la sauvegarde native validée
+de l'étape7 : PTX175741/SHA `937a10d558603414f4f76164339c5abd924929b92a6c2972a9a3a811bbfe99af`.
+Before à préserver; ouvrir uniquement02_after/playlist_names.ptx, renommer
+A_OUTSIDE enAAF_RENAMED_LONG, garderB_INSIDE/clips/positions/médias/cadence,
+save normal. Pas de nouvel export AAF ni média à créer. After175830 octets/SHA
+`710cd3db295baa4a4dae5b939efd5aafa46391c680e542610728549f5464e8ba`.
+Premier header0x1052 désormais24 octets `[16][AAF_RENAMED_LONG][1]`, second
+encore8 `[0][1]`. Identités mono indépendantes concordantes. L'ancien reader
+refusait « Mixed named and anonymous »; cas natif valide désormais résolu en
+lecture seule, chaque nom présent comparé exactement. Les deux WAV sont
+identiques; placement/source/longueurs/bin restent attendus, des changements
+opaques du save ailleurs ne sont pas transposés. Deux cycles par original exacts.
+Fixture ignorée distincte `native_anonymous_playlist_renamed.ptx`.
+
+Adaptation intégrée non publiée : `_validated_main_playlist_records()` partage
+parsing/compteurs/bounds avec le reader et le nouveau writer; `_validated_audio_playlist_names()`
+corrobore noms/identités/widths/index canaux/slotted tracks depuis l'arbre live.
+Lecture anonyme/mixte reste mono; default writer strict inchangé. Nouvelle
+méthode `fill_anonymous_playlist_names()` : prépare tous headers anonymes8
+avant affectation, conserve header[4:] et tous événements/opaque/autres racines;
+exacte égalité des noms existants, zéro canal/latin1/queue inconnue refusés.
+Retour compte de headers (stéréo deux), pas de save ni rename. Schémas identités
+mono/stéréo déjà établis réutilisés; stéréo couverte par composition synthétique,
+pas nouvelle preuve manuelle AAF stéréo. Quinze tests (13synthétiques/2natifs),
+**633 -W error**,60fichiers Python3.8/Pyflakes propres, **1001raises** (844ValueError).
+Autres writers historiques/anonymes non élargis, version/licence inchangées.
+
+**Candidat de nommage maintenant validé :** `35_anonymous_playlist_names/output/api_filled_playlist_names.ptx`,
+175838 octets/SHA `7f91e719a5cfa94a6bfd2f7251a3ef30e9e1afa287b279bd7bc6bb2bdf56c8b7`.
+Base after native; remplit seulement B_INSIDE (+8 octets). Le header A et ses
+événements restent byte-identiques, géométrie/clips/media/172ciblesTOC exacts,
+deux cyclesAPI exacts. Les deuxWAV livrés dansoutput/Audio Files identiques.
+Consignes VALIDATION_API.md : noms/placements/audio, save, fermer/rouvrir et
+déposer le save au même endroit. Retour utilisateur « all goo. suivant » reçu.
+Save natif175822 octets/SHA
+`056f01c9815d06a1d85ae2ee002900cb4e28f8eac3f1248c078ae4930bcb3e4b`.
+Deux noms explicites exacts, placements/longueurs/offsets/media inchangés,
+172ciblesTOC et deux cycles API exacts; fill() retourne0 sans mutation.
+Before/after/WAV toujours aux hashes précédents. Fixture ignorée
+`native_filled_playlist_names_pt_resaved.ptx`, seizième régression de nommage.
+Ce troisième apport est clôturé sur le mono, pas un Save As général.
+
+**Dernier apport — résolution Volume : audit sans changement fonctionnel.**
+Le helper privé `_volume_lanes` n'existe pas dans notre branche. Le resolver
+`_validated_named_audio_volume_lanes` corrobore déjà metadata/miroirs/identité
+0x2619 du chemin natif/slots/largeurs/noms avant accès à la lane Volume directe.
+Pas de scan self.data, setdefault masquant un conflit ou repli ordinal. Les
+schémas inconnus restent refusés. `add_volume_node` inspecté : contrat historique
+séparé, mapping visible ordinal exigeant des comptes égaux, fallback nom interne;
+map anonyme refusée et stéréo visible empêchée par le compte. Ne pas présenter
+cette méthode comme équivalente au resolver corroboré, ni changer son contrat
+implicitement. Utiliser get/set_volume_automation après fill explicite pour
+le profil AAF vérifié. Aucun writer Volume additionnel nécessaire.
+
+Trois régressions de composition ajoutées : cache indisponible et mono après
+stéréo, identité live contradictoire refusée sans mutation ni fallback, édition
+de B après nommage AAF conservant A/pans/clips/172cibles et retrait du point
+restaurant le fichier natif entier. Deux cycles du candidat byte-identiques.
+**637 tests -W error**,60fichiers Python3.8/Pyflakes et diff --check propres,
+1001raises inchangés; pas de nouveau build/version/commit/push/tag.
+
+**Dernier candidat remis, maintenant validé :**
+`Y:\SHARE TO NETWORK\pt_api_debug_contrib\36_volume_identity_mapping\output\api_volume_after_aaf_names.ptx`,
+175828 octets/SHA
+`af75a46c35ebc0f7b786c98c7f973f170331eb912bfe300822b2d11fcabf19cf`.
+Base native du35, seule lane B_INSIDE30->36; point initial0/0dB et point
+10:00:15:00/1730448720/+6dB, AAF_RENAMED_LONG reste0dB.
+WAV copiés et vérifiés identiques. Consignes A_LIRE.md
+dans36 : vérifier ciblage/clips/audio, save même fichier, fermer/rouvrir.
+Retour utilisateur « all goo!! » reçu. Save natif175874 octets/SHA
+`957f05f7a4634b245ded0c5b00b340882fe6ce8da911a3e72dbebf3c9966dbe0`.
+Volume A0dB inchangé, B+6dB sur le bon slot, mais point enregistré à
+1730450722/10:00:15:01 (+2002samples/une image). L'utilisateur confirme
+explicitement « oui, désolé my bad » avoir touché au point avant sauvegarde.
+Ce n'est donc pas un oracle de normalisation native ni un bug API; ne pas
+ajouter de compensation ou annoncer que ce save conserve le timestamp initial.
+Clips/bin/positions/longueurs/offsets/groups/markers/autres lanes/routes brutes
+et172ciblesTOC inchangés; deux cycles API exacts. Les getters de Pan/output
+généraux refusent ce profil AAF déjà à la base; comparaison des blocs opaques
+bruts pour prouver leur conservation, sans nouvel élargissement.
+Deux WAV toujours aux hashes du35. Fixture privée ignorée
+`native_volume_aaf_names_pt_resaved.ptx`; quatrième régression Volume vérifie
+le ciblage et le timestamp natif réellement modifié, autres données et cycles.
+**638 tests -W error**,60fichiers Python3.8/Pyflakes et diff --check propres,
+1001raises inchangés. Les quatre apports de l'issue1 sont clôturés sur ces
+profils documentés; aucun autre test manuel requis dans ce lot. Modernes
+deux-0x2506 et AAF universel restent hors support. Version1.5.2/licence
+inchangées, aucun commit/push/tag par l'agent; revue juridique distincte ouverte.
+
+### Revue des garde-fous après l'audit — 11 octobre 2026
+
+L'utilisateur demande une marge technique justifiée plutôt qu'une liste fermée de commandes testées. Principe : schéma/invariants/bornes/références établis, pas égalité aux valeurs des fixtures; aucun contournement des structures inconnues. Revue des familles lecture, piste, clip, builder/import, groupe, gain et automation : les noms/positions sont déjà variables; les exigences de géométrie, identités, pointeurs, largeur et profils d'authoring ne sont pas supprimées sur la seule intuition.
+
+Cas inutilement restrictif reproduit et corrigé : Pan statique refusé parce qu'une autre piste contient une courbe Pan pourtant déjà prise en charge. Les helpers statiques passent `static_target`, décodent les courbes des autres pistes avec le décodeur existant et gardent la cible strictement statique. `get_track_pan_lr()` valide toujours toutes les stéréo; la cible mono de `get_track_pan()`/`set_track_pan()` garde sa portée précédente sur les témoins stéréo. Pas de collapse, création de lane, écriture UI ou modification des autres courbes. Géométries/états/Volume/références malformés toujours refusés avant écriture, y compris un no-op. Huit tests ajoutés : six synthétiques, un sur une référence native inchangée et un sur une composition explicite issue d'une référence native; modifications limitées aux Int16 ciblés, deux cycles API et retour exact au contrôle. Aucun nouvel essai manuel Pro Tools revendiqué ou requis pour cet assemblage de schémas connus à écriture locale inchangée. Les anciennes descriptions historiques de refus global restent des états de validation datés, pas le contrat courant.
+
+**Audit technique de contribution clôturé le11octobre2026 sur les profils documentés/validés. Étape32 réouverture explicitement confirmée; aucune validation manuelle en attente dans le périmètre intégré. Matrice des apports ci-dessous. Version1.5.2 non publiée, aucun commit/push/tag par l'agent. La revue juridique de provenance et la plainte restent distinctes/non clôturées.**
+Profils testés des étapes1à7 et9à35 clôturés; étape8MXF reportée faute de référence native. Profils UUID modernes, autres géométries et extensions non validées restent explicitement hors support, sans prolonger l'audit présent.
+596 tests réussis après la revue des gardes Pan (588 au point de clôture de l'audit). Sans fixtures privées : 469 exécutés/127 skips explicites; syntaxe Python 3.8 de 57 fichiers, Pyflakes et diff --check propres. Les 984 raises restent inchangés. Aucun nouveau build de distribution après cet ajustement; les artefacts temporaires du point de clôture précédent ne couvrent pas cette modification. Version toujours 1.5.2, aucun commit/push de l'agent. Les sections suivantes
 conservent l'historique des contrôles successifs; leurs anciens nombres de tests
 ne sont pas le total courant. Procéder un point à la fois, sans écriture MXF
 ni élargissement du relink depuis les seules déclarations du contributeur.
@@ -282,13 +495,244 @@ ni élargissement du relink depuis les seules déclarations du contributeur.
 
 - **Retour reçu, étape 20 clôturée le 7 octobre 2026** : save natif 175784 octets, SHA-256 `bdcb218d43a02584df963e3b4a7692a5ceae106d13960a390c0e2b6b120dcff8`. Dictionnaire compacté nativement de 5/178 à 4/148, ancien point inutilisé retiré; MEDIA +6/index 2 et MEDIA-01 +3/index 3 indépendants, courbe B byte-identique/index 0, autre parent à 0. Tous les clips/placements et 172 records-cibles inchangés; huit lanes Volume/quatre pans/deux routes/descripteur `0x1015`/identités `0x1001` bruts identiques. WAV inchangés. Deux cycles exacts et modifications indépendantes +5/-10 puis retour +6/+3 restituent le fichier entier. Fixture ignorée `native_clip_gain_mixed_shared_pt_resaved.ptx` et cinquième régression native optionnelle ajoutées. A_LIRE/rapport de 17 clôturés; plus aucune action à faire dans 17.
 
-### Étape 21 — premier gain statique mixte : sortie API à valider
+### Étape 21 — premier gain statique mixte : clôturée
 
 - Autorisé par « c'est fait pour ... on peut continuer ». Le record statique et la croissance d'un dictionnaire mixte sont déjà corroborés; aucune nouvelle géométrie. Retrait du garde mixte index -1 seulement : `set_clip_gain()` réutilise l'ajout historique avec ses 26 octets de métadonnées vérifiées et Float32 validé; record terminal/count +1, seule cible reliée à l'ancien count. Plusieurs -1 ne sont pas partagés, la branche d'ajout prime sur shared; toute mise à jour ultérieure unique est in-place. Refus d'enveloppe cible/records inconnus et risque UUID moderne inchangés.
 - Référence **construite**, pas paire native before/after : copie du save natif validé de 20 dans `Y:\SHARE TO NETWORK\pt_api_debug_contrib\18_clip_gain_first_static\input\clip_gain_native.ptx`. Seul index de MEDIA-01 3→-1 (sentinelle historique vérifiée), quatre octets changés; count 4/148 conservé, ancien point +3 inutilisé conservé. `output/controlled_no_gain_before.ptx` : 175784 octets, SHA-256 `e6703be230445f86c9579d3d815cd4cd51943cfe3c9243b073e9c4a63e40e3e4`, contrôle diagnostique non demandé à l'ouverture.
 - Sortie après `set_clip_gain('MEDIA-01', -3)` : `output/api_clip_gain_first_static.ptx`, 175814 octets, SHA-256 `f5b8efd24094dfa337e8b0958376ada252e6c33164138180e1ae9d42170326f2`. Nouvel index 4/count 5/payload 178; anciens records après count byte-identiques, MEDIA +6 et courbe active B exacts. Placements/pistes/172 records-cibles inchangés, WAV livrés dans input/output byte-identiques. Deux cycles et mises à jour +6/-10/-3 sans augmentation de count restituent la sortie entière exactement. Originaux de 16/17 et fixtures intacts.
 - 26 tests Clip Gain mixtes : **19 synthétiques, 5 natifs optionnels, 2 sur références natives à conditions construites**. Refus de premier gain remplacé par contrôle d'ajout; trois régressions synthétiques supplémentaires (plusieurs -1 indépendants avec courbe active, -inf/réutilisation, validation tardive des records et autres index) et une dérivée native de l'absence. Nouvelle régression de save partagé de 20 incluse. **412 tests avec -W error**, AST Python 3.8 valide; **844 raises : 13 NotImplementedError**, autres familles inchangées (724 ValueError, etc.). Cinq docs/bible erreurs actualisés; résumé en tête du handoff corrigé, version 1.5.2, aucun commit/push.
-- **Seule action demandée** : ouvrir `output/api_clip_gain_first_static.ptx`, vérifier MEDIA-01/A_OUTSIDE **-3 dB** statique, B_INSIDE courbe inchangée, médias/placements/lecture audio intacts; sauvegarder normalement ce même fichier, fermer/rouvrir et confirmer. Ne pas ouvrir control/input, modifier de point ou refaire une paire. MEDIA du Clip List reste un témoin +6 non placé; ne pas le déposer dans la timeline. A_LIRE.md autonome. **Ne pas publier l'ajout mixte avant ce retour**; vérifier le PTX resauvegardé (ordinals/count peuvent changer), ajouter sa régression et clôturer avant un autre volet. Aucune queue UUID moderne ou enveloppe 0x26 validée par ce test.
+- **Retour reçu le 8 octobre 2026** : l'utilisateur déclare le fichier ouvert et sauvegardé. Contrôle natif : 175799 octets, SHA-256 `8c14bdcfd8632631e56dd7aa164c3dba3159b1da5204f47526deb59dc90093d7`; count 4/148, records 30/30/30/54, MEDIA +6/index 0, MEDIA-01 -3/index 2, MEDIA_01 0/index 1, courbe B byte-identique/index 3. Les clips/pistes/placements et 172 records-cibles restent intacts. Huit lanes 0x260a, quatre conteneurs 0x260c, les 88 blocs 0x2602 du catalogue/routing, 0x1015 et les deux 0x1001 sont exacts; WAV inchangés. Deux cycles API bit-identiques, modifications indépendantes +5/+6/-10 puis retour +6/-3 sans réallocation restaurent le fichier entier. Fixture ignorée `native_clip_gain_mixed_first_pt_resaved.ptx` et régression ajoutées : 27 tests mixtes, **413 tests** au total. Ouverture et sauvegarde seulement explicitement déclarées dans ce retour; ne pas inventer de nouvelle confirmation d'écoute/réouverture. Aucun oracle UUID/0x26 obtenu. Dossier 18 clôturé; ne pas demander de refaire le test.
+
+### Étape 22 clôturée — Clip Gain, enveloppe trois points
+
+- Continuation autorisée le 8 octobre. La contribution utilise des tailles variables, mais son scan de magic et son index -6/-22 heuristique ne sont pas repris. La seule enveloppe conservable validée reste celle de quatre nœuds (0x2e); la taille 0x26 reste explicitement refusée. Aucun nouveau code fonctionnel ni test de géométrie non observée ajouté.
+- Préparation dans `Y:\SHARE TO NETWORK\pt_api_debug_contrib\19_clip_gain_three_nodes` : 01_before et 02_after contiennent des copies byte-identiques du save natif de 21 (175799 octets, SHA-256 `8c14bdcfd8632631e56dd7aa164c3dba3159b1da5204f47526deb59dc90093d7`) et des WAV fournis. Pas de nouvelle session/clip à créer, aucune sortie API modifiée; 01_before doit rester intact.
+- Seule action : dans `02_after/clip_gain_three_nodes.ptx`, B_INSIDE / MEDIA_01-01, supprimer seulement le point de **Clip Gain** à **10:00:12:00**, soit 96096 samples relatifs (proche de 0 dB). Garder les points au départ 10:00:10:00/0, à 10:00:18:00/proche -6 et à 10:00:22:00/proche 0 sans retaper leurs valeurs; A_OUTSIDE/MEDIA-01 reste -3. Sauvegarder normalement le même fichier et fermer. Si un point manque ou des points sont ajoutés automatiquement, arrêter et signaler plutôt que compenser. A_LIRE autonome; un seul changement natif, pas une écriture heuristique.
+- **Paire reçue le 8 octobre 2026** : after 175790 octets, SHA-256 `bfbdf4db4f1ec6b29db6db601959d2de370b8b8d2e4a139eabc75bd3327d099a`; dictionnaire 140 octets/count 4, records 30/30/30/46. Header d'enveloppe `01460100260000000000030000000400020000000000`, nœuds 0/384384/576576, valeurs restantes byte-identiques. Seul le point de 96096 samples a disparu; statiques et liens corroborés par nom malgré permutation des index MEDIA-01/MEDIA_01. Clips/pistes/timeline/172 cibles/Volume/Pan/catalogue/routing/identités média et WAV intacts. Deux cycles par entrée exacts. Refus de 0x26 reproduit avec le validateur précédent sans mutation; fixtures ignorées `native_clip_gain_three_before.ptx`/`after.ptx`.
+- Extension de `_validated_clip_gain_dictionary()` : table de profils d'enveloppe explicite pour 0x26/3 nœuds et 0x2e/4 nœuds, header exact de 22 octets et validation de chaque paire UInt32/Float32. Pas de fallback à taille/arité arbitraire, pas de scan de signature. Autres tailles refusées, nœuds non croissants/non finis/premier non nul et header incohérent refusés avant mutation. Writer statique inchangé, cible d'enveloppe toujours refusée; resolver UUID moderne absent. Deux nouveaux tests synthétiques et trois tests natifs optionnels; anciens cas header/nœuds/magic étendus aux deux profils, anciens refus 0x26 remplacés par refus deux/cinq nœuds. **418 tests**, 32 mixtes (21 synthétiques, 9 natifs optionnels, 2 sur références natives à conditions construites), AST Python 3.8 valide; 844 raises inchangés.
+- Sortie `03_output/api_clip_gain_static_with_three_nodes.ptx` : 175790 octets, SHA-256 `e675c3ca24bb89529bf1a15ef0de01dc9feceec310a950f511d9c8ba482a72c1`. Seul gain de MEDIA-01/A_OUTSIDE -3→+3; un seul octet chiffré modifié (offset 8101), dictionnaire/order/index/enveloppe trois nœuds de B exacts. Tous les autres clips/placements/pans/Volume/routes/médias conservés; six cycles API sur paire/sortie et compositions exacts, retour -3 restituant le native after entier. WAV fournis. Aucun oracle API d'édition d'enveloppe, aucun support UUID moderne annoncé.
+- **Validation utilisateur reçue : confirmé, sauvegardé, continuation autorisée.** PTX natif : 175791 octets, SHA-256 `245a5ccecfc8976c5bdab7cd6e395b947e967e08ed7a0503450c455fd2ff58e8`. Count 4/140, records réordonnés 30/46/30/30; gains comparés par nom : cible +3, témoin +6, parent 0, courbe B exacte. Clips/pistes/timeline/172 cibles/Volume/Pan/routes/catalogue/identités média et WAV inchangés. Deux nouveaux cycles API byte-identiques et compositions -10/-3/+3 restituant le fichier natif entier, cible de courbe toujours refusée atomiquement. Fixture ignorée `native_clip_gain_three_pt_resaved.ptx`, quatrième test natif trois points; **419 tests / 33 mixtes (21 synthétiques, 10 natifs optionnels, 2 sur bases natives à conditions construites)**. Ne pas comparer les octets chiffrés à offsets identiques entre fichiers natifs de tailles différentes; ne pas exiger que remettre -3 efface les métadonnées de cette nouvelle sauvegarde native. Étape clôturée, cinq docs/bible synchronisés; aucun changement fonctionnel de ce retour.
+
+### Étape 23 clôturée — lecture du pan statique mono
+
+- Point suivant isolé après clôture de 22 : lecture du pan principal mono, pas encore writer/automation Pan. Le candidat `get_track_pan()`/`get_track_pan_lr()` utilise un resolver GUID permissif, scan de signature et `self.data`/offsets initiaux; ne pas le reprendre tel quel. Le writer candidat modifie déjà la lane gauche avant de refuser un canal droit sur mono ou une valeur droite invalide : atomicité non sûre, audit séparé requis.
+- Paire préparée dans `Y:\SHARE TO NETWORK\pt_api_debug_contrib\20_pan_static_mono` : réutilisation du before natif mono–stéréo–mono de 17, 179238 octets, SHA-256 `17e9183028fff28ef13339cf514fba418e23ff4891eaf122c861b7395bb75a46`. Copies 01_before/02_after exactes, deux WAV exacts, quatre cycles API exacts. A_OUTSIDE possède une seule lane Pan centrée dans le premier conteneur, second conteneur vide; C_STEREO conserve ses deux pans par défaut; B_INSIDE n'a pas de lane Pan sur sa sortie mono. Le pan absent ne doit pas être assimilé arbitrairement à zéro.
+- Seule action utilisateur : ouvrir `02_after/pan_static_mono.ptx`, passer le pan principal A_OUTSIDE de centre à **L50**, sans breakpoint/passe d'automation/changement de mode, sauvegarder normalement et fermer. Rien à créer, ne modifier aucune autre piste/route/clip/Volume; before intact, 03_output vide. Consignes autonomes A_LIRE.md. Si profil inattendu ou points automatiques : demander clarification, ne pas compenser à l'aveugle.
+- Attendre l'oracle avant d'étendre l'API : comparer géométrie, signe/valeur, propriété piste/slot/lane, témoins stéréo et mono après lui, autres données et pointeurs. Aucun helper Pan ni nouveau profil n'est encore publié/intégré. UUID moderne Clip Gain et MXF restent reportés faute d'oracle; suite 419 tests, version 1.5.2 inchangée, aucun commit/push.
+
+- **Paire reçue le 9 octobre 2026** : after 179208 octets, SHA-256 `9c7ef41c48cd62e900420768d9bbfbdd8db4bff17dbd7ea1e249f53e18427de6`. A_OUTSIDE seule lane Pan Int16 +26 passe de 0 à -50, sample initial zéro, header/30 octets inchangés. Son état UI `0x1029` (279 octets) contient aussi deux Int32 passant 0→-50 à +13/+99; reste de cet état et autres états UI exacts. Ne pas dire que la sauvegarde change seulement la lane ou que son rôle de cache est prouvé. C_STEREO/B_INSIDE pans intacts; Volume/Clip Gain/definitions/clips/placements/routes/catalogue/identités média et 179 cibles logiques conservés. Métadonnées natives/path/chiffrement changent aussi; ne pas les normaliser dans l'API.
+- `get_track_pan(track_name)` et `_validated_static_mono_pan_tracks()` ajoutés uniquement en lecture seule après oracle. Retour entier -100..100, None quand les deux conteneurs mono sont vides; nom absent/invalidité/stéréo/automation refusés. Identités/largeurs Audio, state/Volume et tous les conteneurs mono validés avant filtre; aucune lecture du cache `self.data` ou scan GUID. Second conteneur mono vide, premier vide ou sélecteur 01/lane 0x260a statique/suffixe nul 13; header complet, sample zéro, terminator nul, valeur bornée. Stéréo témoin non décodée, aucun `get_track_pan_lr`/writer/automation intégré.
+- Huit régressions synthétiques et deux natives optionnelles, d'abord rouges faute de méthode puis vertes; fixtures ignorées native_pan_static_mono_before.ptx/after.ptx. Quatre cycles API natifs byte-identiques, WAV exacts et verification indépendante `verify_native_pair.py`; **429 tests avec -W error**, AST Python 3.8 de 41 fichiers, **850 raises** (729 ValueError/70 TypeError, autres catégories inchangées). Les tests comparent le routing brut vérifié : `get_track_outputs()` reste mono-only et doit refuser cette session mixte, aucun élargissement furtif. Cinq docs/bible/erreurs à jour. Étape strictement lecture seule clôturée; ne pas demander une validation manuelle d'une copie no-op superflue. Conserver tous les originaux; prochaine écriture mono distincte possible depuis cette paire, à valider nativement avant publication.
+
+### Étape 24 clôturée — écriture Pan mono, depuis une expérience isolée
+
+- Continuation autorisée par l'utilisateur, un point à la fois. Réutilisation des références natives de 23, sans nouvelle préparation. Le writer candidat de la contribution n'est pas intégré : collapse d'automation et mutation avant validation du canal droit restent exclus.
+- Dossier `Y:\SHARE TO NETWORK\pt_api_debug_contrib\21_pan_static_mono_write`, consignes autonomes A_LIRE.md, script local prepare_candidate.py et rapport.md. Candidat `output/api_pan_mono_L50.ptx`, 179238 octets, SHA-256 `65e8ae822fda728d5b9ea5faafdb10740b41a5a1cd66585008410ad104512b59`, deux Audio Files exacts. Before/after de 20 préservés.
+- Seul Int16 de la lane Pan principale A_OUTSIDE, +26, passe 0→-50. Payload cible égal à l'oracle natif. Deux octets chiffrés changent (157030/157031), tout le reste du fichier déchiffré est exact. Les deux champs UI Int32 corrélés +13/+99 restent volontairement à zéro : leur rôle/nécessité ne sont pas inférés. Ce candidat teste si la lane suffit à Pro Tools, pas un support d'écriture déjà validé.
+- États UI, Volume, Clip Gain, témoins Pan stéréo/mono, clips/placements, routing/catalogue/média, 179 cibles logiques inchangés. Deux cycles API byte-identiques; retour à centre restaure tout le before exact. Copie des WAV contrôlée; AppleDouble exclus. Le script peut recontrôler le candidat identique mais refuse d'écraser un PTX modifié/sauvegardé nativement.
+- **Attendre** affichage L50 dès l'ouverture et pendant lecture, sauvegarde normale/fermeture/réouverture, fichier resauvegardé conservé sur le partage. Si centre/retour centre/erreur : ne pas demander une correction manuelle ni publier le writer; examiner les champs UI depuis des références supplémentaires ciblées si nécessaire. Ne pas passer à une autre fonction Pan avant ce retour. Aucun changement de pt_api.py, 429 tests avec -W error réussis; cinq documents resynchronisés, version/licence inchangées, aucun commit/push.
+
+- **Retour utilisateur reçu le 10 octobre : « all good, test suivant ».** PTX sauvegardé natif : 179229 octets, SHA-256 `fa1f83961bf68ba263eb4a146282456effa785afd12b1994dd6baf0048313086`; A_OUTSIDE -50, C_STEREO -100/+100, B_INSIDE sans lane. UI cible +13/+99 désormais -50, actualisation native non transposée. Volume/Clip Gain/clips/placements/routes/catalogues/identités médias et 179 cibles logiques exacts, deux WAV intacts. Deux cycles API exacts et compositions -100/0/+50/+100/-50 restituent tout le fichier natif.
+- `set_track_pan(track_name, left, right=None)` intégré **après** ce retour, avec helper `_validated_static_mono_pan_target()` partagé par le lecteur. Entier non booléen -100..100, tout right non None refusé avant mutation. Nom/profil validés intégralement, pas d'écriture si cible sans lane (même centre), stéréo/automation refusées; un remplacement du payload préparé, Int16 +26 seul, retour 1/0 et save séparé. Aucun scan/cache ni synchronisation UI. Les erreurs du candidat contrib avant canal droit ne sont pas importées.
+- `tests/test_pan_write.py` : dix tests, sept synthétiques et trois natives optionnelles; d'abord rouges faute de méthode, puis verts. Refus atomiques, no-op conservant l'objet payload, frontières/signe, mono après stéréo, absence sans création, automation/erreur d'autre piste, equality native, cycles/compositions. Fixture ignorée `native_pan_static_mono_write_pt_resaved.ptx`; contrôle externe verify_resaved.py en lecture seule. **439 tests avec -W error, Python 3.8 de 42 fichiers, 854 raises (732 ValueError/71 TypeError, autres inchangés)**. Cinq docs/bible/erreurs synchronisés, version 1.5.2/licence conservées, aucun commit/push. Point mono clôturé : ne pas refaire cette validation.
+
+### Étape 25 clôturée — lecture du Pan statique stéréo
+
+- Nouveau point distinct : vérifier ordre/propriété des deux lanes natives avant un éventuel `get_track_pan_lr()`. Le simple reader candidat permissif/ancien cache ne doit pas être importé. Pas de writer ou automation stéréo intégré avant comparaison.
+- `Y:\SHARE TO NETWORK\pt_api_debug_contrib\22_pan_static_stereo` préparé : 01_before/02_after contiennent `pan_static_stereo.ptx`, copies byte-identiques du save natif de 24 (hash `fa1f8396...13086`), et deux WAV exacts. 03_output vide. Consignes autonomes A_LIRE.md, verify_preparation.py ne concerne que l'état AVANT edit, quatre cycles API exacts.
+- Une seule action utilisateur : ouvrir uniquement le after, sur C_STEREO confirmer gauche L100/droite R100, changer **seulement gauche vers L50**, droite inchangée R100. A_OUTSIDE mono reste L50, B_INSIDE/tout le reste inchangé. Pas de Send/breakpoint/passe ou changement de mode d'automation, Save As ou nouvelle recopie. Sauvegarder normalement le after et fermer. Si contrôles/valeurs ne correspondent pas, arrêter/demander clarification. Attendre la paire; aucune nouvelle capacité stéréo déduite de la préparation.
+
+- **Références reçues le 10 octobre.** L'utilisateur a enregistré l'edit dans 01_before, pas 02_after. Les deux restent conservés tels quels : 02_after correspond toujours exactement à la source native `fa1f8396...13086`, donc il sert de référence originale; 01_before est la référence éditée, 179225 octets, SHA-256 `fc1f1efc5f4d4fd49af6561cd897b769ac00b856dd3f515227ed9854125f08ef`. Ce n'est pas un blocage ni une raison de demander de refaire l'edit. verify_native_pair.py sélectionne les rôles explicites depuis ce contenu/hash, jamais le nom de dossier.
+- C_STEREO : première lane Pan statique passe -100→-50 à Int16 +26, deuxième toujours +100. Même géométrie exacte 30 octets/header/timestamp zéro/terminateur nul. UI cible 279 octets : seuls les Int32 +13/+99 passent aussi -100→-50; aucun rôle général ou écriture de ces champs déduit. Autres UI et pans mono A_OUTSIDE -50/B_INSIDE absent exacts. Volume/Clip Gain/clips/placements/routes/catalogues/identités médias/179 cibles et WAV conservés. Quatre cycles API byte-identiques, aucun PTX supplémentaire créé.
+- `get_track_pan_lr(track_name)` ajouté uniquement en lecture seule. Validation du nom partagée avec les méthodes mono via `_validate_pan_track_name()`; resolver identités/state/Volume/monos existant, puis tous les conteneurs stéréo exacts validés avant filtre. Tuple L/R stéréo, (pan, None) mono, (None, None) mono sans lane. Les deux lanes stéréo doivent être présentes et statiques; absence/automation/geometry inconnue refusées. Pas de scan/cache/UI, mutation/collapse ni save; slot de piste et non ordinal de playlist canal. `get_track_pan()`/`set_track_pan()` conservent leur scope mono et ne font pas appel au décodeur stéréo; right non None toujours refusé.
+- Dix tests tests/test_pan_stereo_read.py : 8 synthétiques/2 natifs optionnels, d'abord rouges faute de méthode puis verts. Valeurs/types/cache absent, mono et absence, stereo first/last/adjacent, noms, erreurs des deux canaux/enveloppes, invalidité d'autres pistes/Volume/mirrors, ancien scope mono, UI natives corroborées et quatre cycles exacts. Fixtures ignorées native_pan_static_stereo_before.ptx (depuis 02_after)/after.ptx (depuis 01_before), noms de rôle explicites dans le dépôt. **449 tests avec -W error (30.699s), syntaxe Python 3.8 de 43 fichiers, 856 raises (734 ValueError/71 TypeError, autres inchangés)**. Cinq documents/bible/erreurs synchronisés; étape lecture clôturée, rien à refaire ni copie no-op à ouvrir. Prochaine écriture stéréo distincte à sélectionner lors de la continuation, sans calibration UI ou collapse d'automation heuristique. Version/licence inchangées, aucun commit/push.
+
+### Étape 26 clôturée — écriture Pan statique stéréo
+
+- Utilisateur demande de poursuivre et d'accélérer; aucune nouvelle session comparative demandée. Réutilisation de la paire de 25 en respectant les rôles réels : original dans 22/02_after (hash fa1f8396...13086), oracle gauche seul dans 22/01_before (fc1f1efc...5f08ef). Originaux jamais remplacés.
+- Dossier `Y:\SHARE TO NETWORK\pt_api_debug_contrib\23_pan_static_stereo_write`, consignes A_LIRE.md, rapport.md et prepare_candidate.py. Candidat `output/api_pan_stereo_L50_R50.ptx`, 179229 octets, hash `c0100f0a4f9ca2957fed23b28d914d5bd0abb2898c1cdfda0676c31cc159d30b`, deux WAV copiés/exacts. Seule action utilisateur : ouvrir ce candidat, confirmer C_STEREO gauche L50/droite R50 dès ouverture et pendant lecture, sauvegarder normalement/fermer/rouvrir et laisser ce même fichier sur le partage. A_OUTSIDE reste mono L50; tout le reste inchangé. Pas d'edit manuel, Save As ou nouvelle copie.
+- Diagnostic externe borné : reader L/R/profils live validés, deux payloads préparés avant mutations. Chaque Int16 +26 remplacé, gauche byte-identique à l'oracle gauche; droite même géométrie native connue, valeur R50 sous validation réelle. Aucun collapse d'automation/création de lane, synchronisation UI ou writer public ajouté. Deux octets chiffrés changent (158851/158913), seuls deux Int16 diffèrent dans le fichier déchiffré; deux cycles exacts et retour -100/+100 restituent toute la source. UI, autres pans/Volume/Clip Gain/clips/placements/routes/catalogues/identités médias et 179 cibles préservés.
+- **Validation utilisateur reçue le 10 octobre 2026**, puis sauvegarde native vérifiée : 179269 octets, SHA-256 `3f7b3eaa52cd66bf6f0a9872e09e062fe06a2b3433bd0ff549c363c5aca9d736`; pans L50/R50, autres pans/Volume/Clip Gain/clips/timeline/routes/catalogues/identités/179 cibles et deux WAV préservés. Deux cycles API byte-identiques. UI cible : seuls offsets 13/41/99/127 différents, autres slots exacts; ces miroirs ne sont pas écrits par l'API.
+- Branche stéréo de `set_track_pan()` intégrée après validation. Helper live `_validated_static_pan_target(..., allow_stereo=True)`, puis validation de tous les pans stéréo via `_validated_static_audio_pan_values(tracks)` uniquement pour cible stéréo. Mono conserve son scope. right=None préserve droite; sinon entier non booléen -100..100, mêmes limites à gauche. Chaque payload changé préparé avant les deux affectations, seulement Int16 +26 modifié. Retour 1/0 par piste, objets identiques conservés; pas d'UI/collapse/lane créée/save implicite.
+- Dix nouvelles régressions `tests/test_pan_stereo_write.py` (7 synthétiques/3 natives optionnelles), fixture ignorée `native_pan_static_stereo_write_pt_resaved.ptx`. Writer reproduit exactement le candidat et oracle gauche seul; cycles/compositions restaurent toute la source et le save natif. Refus de second canal/préparation interrompue/automation/autre piste malformée sans mutation. **459 tests -W error, syntaxe Python 3.8 de 44 fichiers, 858 raises (735 ValueError/72 TypeError, autres inchangés)**. Cinq docs/bible/erreurs synchronisés; version/licence inchangées, aucun commit/push. Ne pas refaire le test clôturé.
+
+### Étape 27 clôturée — lecture d'automation Pan mono
+
+- Dossier partagé `Y:\SHARE TO NETWORK\pt_api_debug_contrib\24_pan_automation_mono` : before/after préremplis depuis le save natif validé de 26, deux WAV copiés et vérifiés; aucun média à recréer. Source protégée par SHA-256 `3f7b3eaa...9d736`.
+- Seule comparaison demandée : dans 02_after, piste A_OUTSIDE, vue Pan principal, point à 10:00:00:00 L50 et second à 10:00:10:00 R50. Ne pas modifier/supprimer les points natifs supplémentaires/implicites, ni mode d'automation, Volume, Send, clips ou autres pistes. Sauvegarde normale/fermeture; 01_before intact.
+- **Paire reçue le 10 octobre 2026** : after 179348 octets SHA-256 `7b573e7fa0feda8100e905c13242c602a666df53a21144ab86bc59e3f60fa6a0`. Pan A_OUTSIDE exact [(0,-50),(1729728000,-50),(1730208480,+50)] : point implicite zéro conservé plus les deux visibles demandés. Payload 30→42, size 20→32, count 1→3/segments 0→2, autres headers/flags/padding/terminateur exacts. Autres pans/Volume/Clip Gain/clips/placements/routes/catalogues/identités/WAV inchangés; UI cible +13/+99 actualisée nativement. 179 records de référence gardent leurs métadonnées, mais trois chemins UI (records 4860/4949/5038) voient 0x258b child-index 1→2 sous 0x2587/0x2551; ne pas prétendre tous les chemins byte-identiques. Aucun réindexage UI ajouté au code, quatre cycles API exacts. verify_native_pair.py conserve les preuves explicites sans écraser les originaux.
+- `get_pan_automation(track_name, right=False)` ajouté en lecture seule : liste fraîche de tuples (samples absolus UInt32, pan signé -100..100), statique un point à zéro, absence mono vérifiée None; nom absent/cible stéréo/right=True/profil inconnu refusés, right booléen strict. Resolver `_validated_mono_pan_tracks(allow_automation=True)` partage tout le profil mono/identités/state/Volume, stéréo témoin opaque. Décodeur complet `_decode_verified_mono_pan_payload()` : size/count/header/flags/segments/réservés/terminateur, premier sample zéro/ordre strict et toutes les valeurs vérifiées. Lecture live sans cache/UI/mutation/save ni liste partielle. Les méthodes statiques utilisent le défaut False et continuent à refuser toute automation. Le helper ancien `_validated_static_mono_pan_tracks` a été renommé, aucune version morte conservée.
+- Treize tests tests/test_pan_automation_read.py (10 synthétiques/3 natives locales), deux fixtures ignorées native_pan_automation_mono_before/after.ptx. **472 tests -W error, 45 fichiers AST Python 3.8, 863 raises (739 ValueError/73 TypeError, autres inchangés)**. Cinq docs/bible/erreurs synchronisés, aucune nouvelle ouverture no-op demandée pour ce lecteur. Version 1.5.2/licence inchangées, aucun commit/push.
+
+### Étape 28 clôturée — écriture d'automation Pan mono
+
+- Dossier `Y:\SHARE TO NETWORK\pt_api_debug_contrib\25_pan_automation_mono_write`, consignes A_LIRE.md, rapport.md et prepare_candidate.py. Candidat `output/api_pan_mono_ramp_R25.ptx`, 179281 octets SHA-256 `34422a3342446e4ac368cad25b42a7520e33ca0926af7ffd68e38f74eff598cb`, deux WAV intacts.
+- Depuis le before statique de 27, recopier la géométrie exacte de son oracle Pan à trois nœuds, puis changer seulement la valeur finale +50→+25 à Int16 +38. Nodes [(0,-50),(1729728000,-50),(1730208480,+25)], lane 30→42. Aucun writer public ajouté. UI/autres données/179 chemins de référence API et WAV inchangés, deux cycles exacts et restauration du payload statique restituant tout le before.
+- Demande utilisateur : ouvrir uniquement le candidat, vérifier A_OUTSIDE L50 jusqu'à 10:00:00:00 puis rampe vers R25 à 10:00:10:00 (maintenue après), courbe/mouvement pendant lecture et après save/fermeture/réouverture. Aucun edit correctif ni préparation audio, C_STEREO L50/R50 inchangée. Attendre ce retour avant intégrer set_pan_automation; aucune extrapolation de flags/headers/état UI ou collapse.
+- Retour positif utilisateur reçu; save natif 179263 octets SHA-256 `5fb1719d6eee812ef69e42502ccb65b9dc3edea56b1df4d9ce8460faa8a04b14`. Nodes réellement enregistrés **[(0,-50),(1729730002,-50),(1730208480,+25)]** : premier point visible +2002 samples, soit **10:00:00:01** au lieu de 10:00:00:00. Dernier point exact, autres pans/UI/Volume/Clip Gain/clips/placements/routes/catalogues/identités/179 chemins de référence inchangés. Ne pas masquer le décalage ni annoncer l'écriture exacte validée. Demander si le point a été déplacé manuellement; sinon comparer ouverture seule et sauvegarde pour isoler une normalisation native. Aucun writer intégré en attendant, ni nouveau PTX fourni au hasard; code/suite 472 inchangés.
+
+- **Clarification utilisateur reçue** : « ah oui désolé. on continue » en réponse à la question du déplacement manuel du premier point. L'utilisateur confirme cet edit; pas de nouvelle session à refaire ni compensation supposée. Positions réelles du save conservées. verify_resaved.py confirme deux cycles exacts, compositions via le writer public restaurant intégralement le save natif, autres données audio/UI/179 références et WAV exacts.
+- `set_pan_automation(track_name, nodes, right=False)` intégré après cette clarification : remplacement intégral d'une lane mono existante, nodes non vide, paires sample UInt32/Pan entier non booléen -100..100, tri/timestamps uniques/premier sample zéro. right booléen False, stéréo/absence refusées. `_validated_mono_pan_automation_target()` factorise résolution live et validation avec le lecteur; erreurs du lecteur conservées. Tout profil existant, toute entrée et le payload préparé sont validés avant une affectation. Retour count, objet payload identique conservé, save séparé; autre UI/automations/routing/médias intacts. Remplacement explicite par un seul point permis, writer statique toujours sans collapse.
+- Treize tests `tests/test_pan_automation_write.py` (10 synthétiques/3 natives optionnelles), fixture ignorée `native_pan_automation_mono_write_pt_resaved.ptx`. Reproduction exacte du candidat et de la lane oracle native, late input/générateur/encodage interrompu sans mutation, limites/tri/no-op/mono après stéréo et conservation du save natif. **485 tests -W error, 46 fichiers AST Python 3.8, 876 raises (745 ValueError/79 TypeError/14 OverflowError, autres inchangés)**. Cinq documents/bible/erreurs synchronisés; aucun commit/push/version modifié.
+
+### Étape 29 clôturée — lecture d'automation Pan stéréo
+
+- Dossier `Y:\SHARE TO NETWORK\pt_api_debug_contrib\26_pan_automation_stereo` : before/after préremplis depuis le save natif de 28 (hash 5fb1719d...a04b14), deux WAV par dossier intacts, quatre cycles API exacts. Courbe mono A_OUTSIDE avec positions réellement éditées préservée; C_STEREO actuellement statique L50/R50.
+- Une seule paire pour les deux canaux : dans 02_after/pan_automation_stereo.ptx, C_STEREO Pan Left 10:00:00:00 L50 puis 10:00:10:00 R50; Pan Right 10:00:00:00 R50 puis 10:00:15:00 L50. Samples 1729728000/1730208480/1730448720, tous dans le clip existant. Points implicites/additionnels conservés; autres pistes/Volume/route/media inchangés, pas de mode/passe ni Save As, sauvegarde normale/fermeture.
+- Attendre la comparaison réelle des deux conteneurs/timestamps/headers et des données témoins avant élargir get_pan_automation. Aucun writer automatisé stéréo ni scan permissif/nouvelle règle UI intégré; étape d'écriture distincte ensuite. Ne pas refaire les étapes 27/28.
+
+- Paire reçue : after 179277 octets SHA-256 `251e9172670f5b035113d39ca76fe3eac4811ee30e9aec6fecd202b67bf816c2`. C_STEREO gauche [(0,-50),(1729728000,-49),(1730208480,50)], droite [(0,50),(1729728000,50),(1730448720,-50)]. Premier point gauche visible **L49 natif**, lecture exacte sans arrondi ni demande de refaire l'edit. Mêmes géométries complètes count 3/segments 2/flags 2, lanes 42 octets. Courbes mono/audio/media/Volume/Clip Gain/WAV/179 références et metadata préservées; UI native actualisée sur mono et stéréo seulement, sans transposition au code. Quatre cycles API exacts, verify_native_pair.py en lecture seule, originaux protégés.
+- get_pan_automation supporte désormais right booléen False gauche/True droite stéréo. Resolver renommé `_validated_pan_automation_target(..., allow_stereo=True)` : pour une cible stéréo, tous les pans mono puis les deux conteneurs de toutes les stéréo validés avant canal filtré. Mono conserve les témoins opaques, right=True refusé avec `A mono Pan automation target has no right channel.`. Writer garde allow_stereo=False, cible stéréo refusée. Décodeur de conteneur `_decode_verified_static_stereo_pan_container(..., allow_automation=True)` partage la géométrie et appelle le décodeur d'enveloppe mono historique (même profil natif), mode statique False inchangé. Aucun helper ancien mort, cache/scan/UI/mutation/save implicite ajouté.
+- Dix tests `tests/test_pan_automation_stereo_read.py` (8 synthétiques/2 natives), deux fixtures ignorées native_pan_automation_stereo_before/after.ptx. **495 tests -W error, 47 fichiers AST Python 3.8, 876 raises inchangés**. Docs/bible/erreurs mis à jour, table des signatures Pan du README complétée. Aucun no-op supplémentaire à ouvrir pour ce seul lecteur, version/licence inchangées, aucun commit/push.
+
+### Étape 30 clôturée — écriture d'automation Pan stéréo
+
+- L'utilisateur ne sait pas si le point a été déplacé manuellement. Retest préparé dans `27_pan_automation_stereo_write/output_retry_exact/api_pan_stereo_ramps_25_retry.ptx`, SHA-256 strictement identique au candidat initial `3cd1e132...`, deux WAV intacts, sauvegarde précédente conservée. Consignes `A_LIRE_RETEST.md` : relever le point droit avant toute sauvegarde; si exact, save sans edit/fermer/rouvrir et relever à nouveau. Si déjà décalé, fermer sans save. Ne pas attribuer la cause à une manipulation tant que ce retest n'est pas confirmé.
+- Anomalie signalée : le dernier point droit L25 apparaît à 10:00:14:22 au lieu de 10:00:15:00. Le candidat original reconstruit isolément retrouve exactement son SHA-256 initial et le timestamp 1730448720. Le fichier désormais sauvegardé dans output (179319 octets, SHA-256 `253450b7032a89699a94ebdc9cf4670f6e69a0e421065983d6140dc94da21fad`) contient 1730444716 : -4004 samples, soit deux frames à 48 kHz/enum 9. Courbe gauche exacte. Cause non établie : demander si un point a été édité et si le décalage était présent avant sauvegarde. Aucun décalage compensatoire ni intégration du writer stéréo; fichier utilisateur préservé.
+- Dossier partagé `Y:\SHARE TO NETWORK\pt_api_debug_contrib\27_pan_automation_stereo_write`, consignes A_LIRE.md/rapport.md/prepare_candidate.py. Candidat output/api_pan_stereo_ramps_25.ptx, 179287 octets SHA-256 `3cd1e1325fd23b6c16a635c78017a4b37998a900df5b7c7c862e9a2363ce3b3a`. Deux WAV exacts; source before29 protégée et aucun fichier resauvegardé remplacé.
+- Essai externe reprenant les deux géométries natives à 3 nœuds, préparées avant remplacement des lanes. Gauche [(0,-25),(1729728000,-25),(1730208480,25)], droite [(0,25),(1729728000,25),(1730448720,-25)]. UI/autres données/179 références préservées, deux cycles API exacts et retour aux deux statiques restituant tout le before. Aucun writer stéréo automatisé public encore intégré.
+- Seule action : ouvrir le candidat, courbes et mouvements C_STEREO gauche L25→R25 à 10:00:10:00, droite R25→L25 à 10:00:15:00, début 10:00:00:00 et points implicites initiaux. Pas d'edit correctif, A_OUTSIDE/B_INSIDE inchangées. Save normal/fermeture/réouverture et même fichier conservé dans output; attendre ce retour avant extension du writer, aucun nouveau header/UI déduit.
+
+### Clôture de l'étape 30 et reprise de l'étape 31
+
+- Confirmation utilisateur : retest exact, l'écart de deux frames était une manipulation. Sauvegarde native du retest 179369 octets SHA-256 `6397b241604871575c0dd4cad061f14ae01d26cbd2abba814046f74707fff6ea`; positions exactes gauche/droite, autres données audio/Volume/Clip Gain/routes/catalogues/placements/WAV/179 cibles conservées. Original et premier save décalé préservés. Aucun compensateur de timestamps ni réinterprétation UI.
+- `set_pan_automation()` étendu au canal sélectionné mono/gauche/droite : resolver partagé avec le lecteur, prévalidation des deux conteneurs de toutes les stéréo pour cible stéréo. Mono conserve son scope/témoins opaques, right=True refusé sur mono. Même contrat nodes/count/no-op/unique mutation/save séparé. Ancien paramètre privé allow_stereo et son refus global devenus inutiles retirés. Pas de nouvelle lane ou transaction multi-canal implicite.
+- Sept régressions `tests/test_pan_automation_stereo_write.py`, cinq synthétiques/deux natives; fixture locale ignorée `native_pan_automation_stereo_write_pt_resaved.ptx`. Reproduction exacte du SHA du candidat validé, cycles/restauration entière/no-op/input ou profil tardif invalide sans mutation. **502 tests -W error**, syntaxe Python 3.8 de 48 fichiers, **874 raises : 743 ValueError/79 TypeError/14 OverflowError, autres inchangés**. Cinq documents synchronisés, version/licence inchangées, aucun commit/push.
+- Étape 31 préparée dans `Y:\SHARE TO NETWORK\pt_api_debug_contrib\28_marker_delete` : `01_before`, `02_after_delete_one`, `03_after_delete_all` contiennent chacun `marker_delete.ptx` et les deux WAV exacts. Base déjà validée étape2, SHA `0181f92b23202a0fd4ace48b11b98c0b372db9e0156f68ae24eff0368115339d`, 25 fps, trois markers index 1/2/3. Aucun changement API : copies binaires natives exactes, deux cycles no-op/source intacts. Consignes A_LIRE.md : dans 02 supprimer seulement index2/M25_NEXT_SECOND, garder index1 et3 sans renumérotation; dans 03, copie indépendante, supprimer les trois markers sans supprimer règle/piste/clip. Save normal/fermeture, pas Save As/Copy In. Attendre les deux comparaisons avant writer.
+- Risques connus de la suppression contrib : offsets de blocs retirés non déclarés au TOC, zéro forcé du trailer au retour vide, parsing permissif et écriture successive non atomique. Ne pas copier ce code. Comparer l'identité des markers survivants, assignment de règle, conteneur/compteur/trailer natifs et références avant intégration transactionnelle. Profil d'ajout moderne 2025/2026 non vérifiable avec PT 2024.3.1, hors support tant que référence manquante.
+
+### Étape 31 — suppression de markers clôturée
+
+- Oracles reçus : before192436 SHA `0181f92b23202a0fd4ace48b11b98c0b372db9e0156f68ae24eff0368115339d`; after index2 supprimé192156 SHA `533a2784ac8edf0df38006ec0304472b0a3f15ba9c427bb506892927374e8ed7`; after tous supprimés191536 SHA `b73602f64731e2a1a4c0283e5797eea89aea02de165df31865f1256d15fc02c4`. Numéros1/3 conservés, seule différence des survivants UUID raw secondaire+23..38 régénéré au save. Autres différences natives opaque UI/state/catalogues observées, pas copiées. Lectures audio/pistes/clips/placements et deux WAV identiques. Règle type5/2030, markers type18/2077 sept items; vide brut12 nul. 167records standards, aucun vers marker/descendant supprimé; purge de telles références prouvée synthétiquement seulement.
+- `delete_marker(index=None,name=None)` candidat non publié intégré avec `_validated_deletable_point_marker()` : exactindex/name/ET, nom partagé permis, type/range/UTF8 stricts, tous les markers legacy point/assignment0 validés avant filtre (y compris autre marker/no-match), compteur/trailer/keep-list et copies metadata préparés avant mutation. Types/offsets de tout sous-arbre retiré collectés et table standard validée avant mutation. Survivants et trailer8 opaques conservés, pas de renumérotation ou UUID natif cloné. Aucune lecture-cache/TC conversion/save implicite; formes modernes/ranges/multi-règle refusées sans heuristique.
+- Treize tests `tests/test_marker_delete.py`, neuf synthétiques/quatre natives. Fixtures ignorées `native_marker_delete_before/one/all.ptx`; trois originaux protégés. Six cycles oracle exacts, candidats byte-stables sur deux cycles chacun; regression recordconstruit vers marker/descendant supprimés et survivant (relocalisation/purge/count/rechargement), trailer synthétique non nul/critères/noms partagés/no-op/empty/re-add/erreurs tardives/input/table/metadata atomiques/cadences. **515 tests -W error**,49 fichiers Python3.8,889 raises (756ValueError/81TypeError, autres inchangés); docs/bible/erreurs synchronisés.
+- Sorties `28_marker_delete/output_delete_one/api_delete_marker_2.ptx`192131 SHA `9c472a3465f61cac51768d9314ac0d51f593e7d4bf3365d474ea664137631211` et `output_delete_all/api_delete_all_markers.ptx`191530 SHA `b67aa61da76bec01b1de644bad6a251d0e711f813464e780b59dd39303332e17`, deux WAV copiés exacts par dossier. `prepare_candidates.py` vérifie hashes/oracles/UUIDdiff/cycles/sourceprotected et tous les autres roots API avant save/167cibles intacts. `A_LIRE_API.md` : aucune édition, ouvrir chaque sortie, vérifier markers1/3 ou0 et piste/règle/clip intacts, lire/save/fermer/rouvrir, conserver mêmes fichiers. **Attendre ce retour et contrôler les saves avant clôturer; ne pas publier sur seulement un rechargement API.** Aucun commit/push/version/licence modifiés.
+
+### Clôture de l'étape 31 et préparation de l'étape 32
+
+- Retour utilisateur positif sur les deux sorties API. Partiel resauvegardé192137 SHA `dcc67be7280d067f3d6dd8009add13a82ec0d9718fd5d328b24fc017137ab5a1`, vide191539 SHA `af98586bb4b1d09b9809333f32c0fa2fe379ead40b2b1e788430c2e72aa2a807`. Survivants1/3 byte-identiques au before y compris UUID; forme vide exacte, pistes/clips/placements/WAV/167 cibles et metadata inchangés. `verify_resaved.py` vérifie hashes, préservation fichiers, quatre cycles exacts et suppression des points restants. Fixtures ignorées `native_marker_delete_one_pt_resaved.ptx` et `native_marker_delete_all_pt_resaved.ptx`; deux tests supplémentaires, quinze pour le writer, **517 tests -W error**,49 fichiersPython3.8,889raises inchangés. Runtime docstring et cinq docs/bible ajustés, step31 clôturée, profil non élargi.
+- Étape32 `Y:\SHARE TO NETWORK\pt_api_debug_contrib\29_clip_delete` : deux cas `01_no_fade` et `02_fade_out`, chacun `01_before`/`02_after`, basename `delete_clip.ptx` et un WAV copié exact. Source sans fade75890 SHA `e649d79a327f1ca9fea4b9073af9956d1dbcb9535b6d49af592a6ce531925fbf`; source fade-out natif resauvegardé76062 SHA `8d40c1dbfdf04413ac89da9dddcdfdc437fc319d413aba5e15d159cf739e55b0`. Copies binaires byte-identiques, quatre cycles no-op exacts et source intacte. 48kHz/25fps, piste Audio1/clip Audio1_01, seul audio192192 samples à1728000000, un fade-out96192 samples dans le second cas. A_LIRE.md : ouvrir seulement chaque after, supprimer le clip complet uniquement du timeline (pas seulement le fade), conserver piste/bin/WAV, save normal/fermer; before protégés, aucune création/reimport/Save As/Copy In. Timelines attendues vides.
+- Audit B4 commence par cette suppression minimale : la contribution retire événement audio et fades liés, conserve définitions/bin/gain et géométries orphelines, annonce acceptation d'ordinal sparse dans un oracle qu'on n'a pas. Ne pas recopier ni annoncer cette géométrie validée sans comparaison/ouverture de notre sortie. Suppression avec crossfade annoncée comme supprimant aussi la transition du voisin, sans conversion en fade-in : sémantique destructive différente de Pro Tools, **hors support sans oracle/décision explicite**. Cible partagée/multiples placements doit rester non ambiguë; pas de suppression générale arbitraire déduite. Les nouveaux trims in-place/keep_clip_regions et import filesystem B5/CLI restent distincts de ce point; moderne B7/MXF encore reportés.
+
+### Étape 32 — oracles reçus et deux candidats à valider
+
+- Sans fade after75923 SHA `ccb329a8ff62d34b87122b2372c5a2e04d753cab3f8e63d189ec04efb5bcb23e`; fade-out after75954 SHA `9059d0593904e512e7b0d9594d1d70d0b90ae6e58143c4ae9d833a3601600e28`. Les quatre fichiers natifs passent huit cycles byte-identiques. Les deux timelines deviennent vides, piste et clip dans la bin/WAV conservés; le fade-out et sa géométrie sont retirés nativement, root2630 compteur0. Autres différences natives de définitions/identités/UI opaques observées, pas transposées dans le writer.
+- Candidat public `delete_clip(clip_name)` dans le module officiel : nom UTF-8 exact sans NUL, définition et placement principal audio uniques, little-endian, payload35/+33=0, longueur positive/finUInt64. Compteur playlist réparé, segments opaques et survivants préservés; bin/définitions/gain/catalogue/media inchangés. Retour nombre d'événements timeline retirés1/2, aucune sauvegarde implicite. Fades globaux validés; seul fade-out29/type2 avec durée répétée UInt24, ownership unique et root2630 natif à une géométrie accepté pour suppression. Géométrie retirée et root vidé, pas conservée orpheline. Crossfade/autre fade attaché/compaction multi-géométries refusés avant mutation; aucun élargissement déduit depuis le contributeur.
+- Tous les replacements et les métadonnées offsets/types sont préparés avant affectation; tableTOC vérifiée, conflits refusés. Purge des sous-arbres audio/fade/geometry via pipeline existant. Quatorze tests `tests/test_clip_delete.py` (11 synthétiques/3 natifs) : critères/ambiguïtés/noms invalides, groupes-IDcollision, autres pistes/fades inchangés, refus de profils, erreur de préparation tardive, table invalide et metadata atomiques, purge de records construits vers événement/descendant/géométrie et relocalisation survivant, 25/23.976/44.1/96k sans conversion. Fixtures locales `native_clip_delete_plain_before/after.ptx` et `native_clip_delete_fade_before/after.ptx` ignorées individuellement. **531 tests -W error**,50 fichiers Python3.8,907raises (770ValueError/82TypeError/16NotImplementedError, autres inchangés).
+- `29_clip_delete/output_plain/api_delete_clip_plain.ptx`75834 SHA `1cf7c562c910ad300979528e24be97c260049968d2f3745d45866bd01729ae9c`; `output_fade_out/api_delete_clip_fade_out.ptx`75912 SHA `6cb091268e66cf85a586b038bcf85db6d3cb74ef336c299a2f698c9a9301cbc0`. Chaque dossier contient le WAV copié exact. Les structures1054/2630 reproduisent l'oracle, tous les autres roots exacts avant save, 167 cibles/metadata conservés et quatre cycles API byte-identiques. Les natifs n'ont aucun record vers les événements supprimés : purge de ces records prouvée synthétiquement seulement. `prepare_candidates.py` protège originaux/saves existants, `A_LIRE_API.md` donne contrôle minimal sans nouvelle session : pisteAudio1/timelinevide/clipAudio1_01 encorebin/mediaonline, save normal/fermer/rouvrir chacun. **Attendre ce retour et analyser les deux saves pour clôturer.** Aucun commit/push/version/licence modifiés.
+
+### Étape32 — saves natifs vérifiés, étape33 préparée
+
+- Retour « j'ai sauvegardé les deux séquences, on continue » : ouverture/save confirmés, pas de déclaration explicite de fermeture/réouverture. Sans fade75894 SHA `433c15d14a3d94a802f8ccc796a958db39476c3dd317a18a504d5ea88902af0e`; avec fade75934 SHA `ecbee253d0390a61ec740c2558325da16e0eb01a3f812cc891f85de5c024d08f`. Chaque save a les roots1054/2630 exacts à l'oracle vide, lectures pistes/bin/longueur/offset/media et gain exacts; link média ordinal0/filename inchangés, WAV exact et167 cibles/métadonnées TOC préservés. Les bin/catalogues natifs changent des identités opaques au save; ne pas prétendre qu'ils sont byte-identiques à la source ni copier ces changements au writer. Quatre cycles API supplémentaires byte-identiques et originaux/saves protégés via verify_resaved.py.
+- Fixtures ignorées `native_clip_delete_plain_pt_resaved.ptx` et `native_clip_delete_fade_pt_resaved.ptx`, deux tests supplémentaires dans test_clip_delete (seize dont11synthétiques/5natifs). **533 tests -W error**,50 fichiers Python3.8,907raises inchangés. Docstring/README/architecture/bible/changelog harmonisés. Demander seulement confirmation de réouverture, pas nouvel edit de ces sorties; writer non publié, limites crossfade/autresfades/compaction inchangées.
+- Étape33 `Y:\SHARE TO NETWORK\pt_api_debug_contrib\30_trim_inplace` : `01_head`/`02_tail`, chacun01_before/02_after et trim_clip.ptx/Audio Files. Quatre copies exactes du save validé compact `04_clip_source_offset_uint8/output/api_source_offset_uint8_noop.ptx`,171594 octets SHA `32e57df19dac2c4113c187f5a77831783868047b77cbf3795726032d6d511f54`; WAV SHA `054e57b0d711aa69cb8920217693ce76e9b4c199c4aac99a8c527c06cec0d312`. Deux cycles source exacts, copies et sources protégées par prepare_native_pairs.py. 48kHz/23.976, Audio1/Audio1_01-01, un placement sansfade : start1729728100/end1738408672/length8680572/offset100. Aucun nouveau média ou writer intégré.
+- A_LIRE.md autonome : ouvrir seulement01_head/02_after, sélectionSamples[1729728200,1738408672], Trim Clip To Selection, retirer100 du début sans déplacement, finfixe/offset attendu200/length8680472; sauvegarder/fermer. Puis autre copie indépendante02_tail/02_after, sélection[1729728100,1738408572], retirer100 de fin, débutfixe/offset100/length8680472; save/fermer. Laisser noms natifs automatiques/bin/piste/WAV intacts, pas de rename/Save As/Copy In/consolidation. Ne pas composer les deux trims. Valeursavant explicites, arrêt si différentes. Comparer sourceoffset/longueur/timestamps et évolution des définitions avant de décider comment supporter le trim en place; ne pas réécrire le trim historique à partir des déclarations contrib. Demande courte de confirmation réouverture étape32 incluse en fin de consignes. Version1.5.2/licence inchangées, aucun commit/push.
+
+### Étape33 — ouverture des after confirmée, trims encore à faire
+
+- Retour utilisateur : « les deux sessions after s'ouvrent sans problème ».
+  Les fichiers30_trim_inplace/01_head/02_after et02_tail/02_after ont été
+  sauvegardés (171587 octets chacun, SHA respectifs
+  `09174b9b802a0b0efa54819c950dcb3bbf12d156dc3e15eb51238087379f4593` et
+  `154081a2c3030313c4c490d5e62fe5eb063c8276db5df4930bb5aa6679794a8c`).
+  Mais leurs placements restent exactement start1729728100/end1738408672,
+  length8680572/sourceoffset100 : aucun trim natif demandé n'est encore
+  présent. Before protégés inchangés. Ne pas régénérer/écraser ces after,
+  ne pas intégrer le writer depuis leur seule ouverture. Demander les deux
+  sélections Samples précises de A_LIRE.md, Trim Clip To Selection et save.
+  Le mot after correspond ici aux dossiers du nouveau test; ce retour ne
+  confirme pas sans ambiguïté la réouverture des sorties API étape32.
+  Suite/code inchangés (533tests), aucun nouveau profil ni commit.
+
+### Étape 33 — trims natifs reçus, deux sorties API à valider
+
+- Retour « ok c'est fait ». Head : 171875 octets, SHA `6b2b91e757bc8555523b3dce47e10e5816c7adacb168f7b4f9997e386974f4d4`, start 1729728200 / end 1738408672 / longueur 8680472 / offset 200. Tail : 171587 octets, SHA `cf3efb566084e50a1da3da0607c8b57b78701fcb99e94fc293ffffa687f6dfcc`, start 1729728100 / end 1738408572 / longueur 8680472 / offset 100. Before original intact. Header compact `01 10 30 44 08`, type 4/2628, payload A+64. Head change source A+5, longueur A+6/3, paire UInt32 A+9/A+13 et événement UInt64+7; tail change uniquement la longueur. Queue A+17 de 47 octets exacte.
+- Le head natif garde une copie supplémentaire de l'ancien clip dans la bin avec le même nom : trois définitions, deux homonymes. La comparaison suit le placement ordinal 1; elle ne cible jamais l'oracle homonyme par nom. Pas une corruption ni une raison de refaire le test. Le contrat API en place garde deux définitions sans backup, nom/ID/UUID et parent inchangés.
+- Candidats publics `trim_clip_head/tail(clip_name, cut_samples)`, helper `_trim_clip_inplace()` : cut absolu session UInt32, nom exact UTF-8 sans NUL, définition et placement audio uniques, payload 35 / +33=0, pas d'événements cachés ou alternatifs. Profil strict 0x1001 / longueur UInt24 / type4 / raw unique / A+64, queue exacte sans gain, offset positif UInt8, deux timestamps définis égaux au placement. Head avance offset/start/paire, tail change seulement longueur. Dépassement UInt8, inconnus, sentinelles, déplacement, gain et profils non corroborés refusés. Bindings globaux vérifiés et toute playlist cible contenant un fade refusée; aucun orphelin ou compaction. Les deux payloads sont prêts avant affectation, sans deep-copy rollback remplaçant les objets. Retour ID source 1, save explicite. `trim_clip_start/end`, `_trim_clip` et `create_subclip` restent AST-identiques au HEAD.
+- Onze tests `test_trim_inplace.py` (8 synthétiques / 3 natifs) : entrées/bornes/largeurs/profils/gain/sentinelle/références cachées/collision d'ID groupe/fades, refus atomiques, échec du second encodage, préservation des objets et compositions sans conversion de cadence. Fixtures `native_trim_inplace_before/head/tail.ptx` ignorées. Huit cycles des quatre copies natives et quatre cycles de sorties exacts; payloads/événements cibles identiques aux oracles, autres roots intacts. **544 tests -W error**, 51 fichiers Python 3.8, 921 raises (781 ValueError / 84 TypeError / 17 NotImplementedError, autres inchangés).
+- Sorties `30_trim_inplace/output_head/api_trim_head.ptx`, 171594 octets, SHA `f2b7f0eb282099300145fe61d45d5980dbe449f28619f0fef17d9c8ae4f3d3ac`; `output_tail/api_trim_tail.ptx`, 171594 octets, SHA `2dd2c344200dbf82d10f8f7538c6f560ee72e21df9076f1ea4a2c550c0c27860`. Head change cinq bytes décryptés (7904/7905/7908/7912/152886), tail un byte (7905), tous dans les champs corroborés. Taille de fichier et 167 cibles/métadonnées exactes; WAV copié byte-identique. Originaux protégés via `prepare_candidates.py`.
+- `A_LIRE_API.md` : sans nouvelle édition, ouvrir/écouter/vérifier Start-End en Samples/save/fermer/rouvrir les deux, garder les saves au même emplacement. Piste Audio 1, clip Audio 1_01-01, média Audio 1_01.wav, parent intact, pas de backup attendu. **Attendre le retour et analyser les saves avant clôture**; aucun support général des autres familles/fades/timestamps déduit. Cinq docs/bible/catalogue d'erreurs synchronisés, version 1.5.2/licence inchangées, aucun commit/push.
+
+### Étape 33 — sorties sauvegardées validées le 11 octobre 2026
+
+- L'utilisateur confirme les deux sorties et une erreur de transcription : tail démarre bien à 1729728100, pas 1729241100. Pas de bug de placement démontré, aucune compensation ajoutée. Head start 1729728200 / end 1738408672 / source 200; tail start 1729728100 / end 1738408572 / source 100. Longueur 8680472 dans les deux.
+- Saves de 171558 octets chacun : head SHA `055a11bddb2a73172a3623e2cb646679c41c13b4cd75d5f421a3a7aaef79e8dc`; tail SHA `8b0edc58afd5c6b53574b758a1d3ea561565d613c6e6e64fedfe733e48dcdc05`. Lecture timeline, parent, deux définitions et 167 cibles exacts; WAV byte-identiques. Ne pas prétendre que tous les champs opaques du catalogue sont byte-identiques à la source lors d'un save Pro Tools.
+- Deux fixtures natives resauvegardées ignorées et deux régressions : quatre nouveaux cycles exacts, poursuite head +25 / tail -25 en mémoire sans nouvelle définition. Treize tests trims en place; suite **546 tests -W error**, 51 fichiers Python 3.8, 921 raises inchangés. Profil strict inchangé, anciens writers non réécrits. Étape 33 clôturée; ne pas demander de refaire ces trims.
+
+### Étape 34 — conserver deux plages d'un clip, oracle attendu
+
+- Dossier partagé `31_keep_clip_regions`, une seule paire `01_before/keep_regions.ptx` et `02_after/keep_regions.ptx` avec Audio Files, copiée byte-identique depuis le before protégé de l'étape 33. Script `prepare_native_pair.py` refuse tout dossier de session existant et vérifie hashes/PTX/WAV; originaux préservés. Aucun nouveau WAV à produire.
+- `A_LIRE.md` : ouvrir seulement 02_after, compteur Samples / Slip, départ 1729728100 et fin 1738408672. Séparer à 1729776100, 1729872100 et 1729920100; supprimer seulement le milieu [1729776100,1729872100) et la fin [1729920100,1738408672). Garder exactement [1729728100,1729776100) et [1729872100,1729920100), 48000 samples chacun. Sans déplacement, fade, renommage, consolidation ni nettoyage de Clip List; laisser noms et définitions automatiques. Sauvegarder/fermer/rouvrir et écouter.
+- Cible : examiner fragmentation, références/UUID/bin, timestamps et changement de largeur de source (offset initial 100, second 144100), pas supposer qu'un champ UInt8 peut être simplement élargi. La contribution construit les fragments ultérieurs depuis une définition déjà mutée, ajoute à nouveau le delta de timestamp et reprend des offsets de gain/UUID génériques; ces hypothèses exigent un oracle. Ne pas recopier sa normalisation de user timestamp ni ses géométries de fade orphelines.
+- Aucun `keep_clip_regions()` / `_build_fragment_def()` contrib intégré, aucune nouvelle API annoncée. Attendre le after natif avant choisir un candidat sûr; si le profil exact diffère, analyser plutôt que proposer des edits correctifs spéculatifs. Version/licence inchangées, aucun commit/push.
+
+### Étape 34 — oracle reçu, candidat isolé à ouvrir
+
+- Retour utilisateur : second et dernier clips supprimés. After 172486 octets SHA `3526700422b155b6c512daf8a7120b903ae2b909fd5e07641e3a851ea175f156`, les deux portions exactes : Audio 1_01-02 / 1729728100→1729776100 / source100; Audio 1_01-06 / 1729872100→1729920100 / source144100, chacune 48000. WAV identique. Bin de cinq définitions, les morceaux supprimés conservés dans la bin; références timeline ordinaux1 et3, 167 cibles/métadonnées TOC inchangées. Originaux protégés, quatre cycles API exacts des deux références.
+- Payloads 0x2628/type4 : premier header `01 10 20 44 08`, sourceUInt8/lengthUInt16; second `01 30 20 44 08`, sourceUInt24/lengthUInt16. Suivent deux UInt32 égaux au début de chaque placement et la queue47 historique exacte, pas de UUID audio. Identité raw48 : octet22 FF, UUID23..38. `0x4403` opaque identique; records raw104 natifs gardent leur structure, changement opaque temporel au save non reproduit. Ne pas assimiler tous les refreshs natifs au découpage.
+- Défauts de la voie contrib sur cet oracle : conserve les largeurs du prototype (second offset déborde UInt8), impose user timestamp FFFFFFFF contrairement à la paire, écrit UUID dans les 16 derniers octets audio, dérive les fragments suivants du premier déjà muté (delta potentiellement ajouté deux fois). Son tail104 C5/counter magique n'est pas corroboré ici. Aucun de ces writes intégré. L'ancien `create_subclip()` utilise identity22..37 plutôt que la zone native observée23..38 : audit distinct à conserver, pas de correction de cet ancien writer ni de certification implicite pendant ce candidat.
+- `prepare_candidate.py` externe et isolé, gardes hashes/destination absente : construit les deux payloads explicitement depuis le prototype intact et les confronte aux attributs/événements natifs. Premier nom/ID1 conservé; seconde définition ordinale2, nom Audio 1_01-01#1729872100, UUID frais seulement23..38, offsets du clone effacés. Parents/104/4403/autres roots intacts; trois définitions au lieu des cinq de l'historique natif, aucun morceau supprimé créé. Deux compteurs ajustés, premier événement conservé, second cloné, pas de record TOC ajouté/purgé ni de gain/fade touché.
+- Candidat `output/api_keep_two_regions.ptx`, 171949 octets SHA `dcb02dc8ecf9109cbaa6d34931c8b29b632cede3df89dec76e5f00eb778b0da5`, WAV exact. Deux cycles du candidat exacts, 167 cibles/métadonnées conservées. Trois tests `test_keep_clip_regions_native.py`, deux fixtures after/candidat ignorées (before réutilise celle des trims) : géométries/largeurs/timestamps/identités/IDs/roots/parents/absence de méthode publique et six cycles exacts. **549 tests -W error**, 52 fichiers Python 3.8, 921 raises inchangés.
+- `A_LIRE_API.md` : ouvrir seulement le candidat, ne rien éditer; vérifier les deux positions et le trou de deux secondes, écouter/save/fermer/rouvrir, garder le même fichier sur le partage. **Attendre ce retour avant intégrer une méthode publique**, pas de writer multi-plage général déduit. Cinq docs/bible actualisés, version/licence inchangées, aucun commit/push. Ne pas demander de refaire les trois séparations natives.
+
+### Étape 34 clôturée — writer public le 11 octobre 2026
+
+- Retour « all good, on continue » suivant les consignes ouverture/lecture/save/réouverture. Save partagé 171920 octets SHA `03efc9fdd12272d1652a8e945499503ccc6c76af3d8b01f15edc24c8ecdca064`, deux placements exacts et offsets100/144100, trois définitions, WAV et 167 cibles préservés. Fixture native resauvegardée ignorée; pas d'écrasement des after/candidat existants.
+- `keep_clip_regions()` intégré : paires UInt32 absolues non vides, tri et absence de chevauchement; nom exact UTF-8 sans NUL, définition/placement unique. Toute référence cachée/alternative, overlap audio sur la playlist cible, fade (même non attaché), profil/source/identité/queue/gain/timestamp inconnu refusé. Cible sourceUInt8/UInt24, longueurUInt16/UInt24, header44/08, type4/tail47; raw48 identité historique + opaque4403 + raw104 natifs corroborés, deux timestamps définis=placement. Source2/4, longueur1/4, source0 et sentinelles restent refusés.
+- Payloads générés : source1 si <=255 sinon3, longueur2 si <=65535 sinon3, bornes source/longueur <=0xffffff. Champs larges peuvent encoder des valeurs plus petites sans tronquer ni interpréter une largeur source2. Les deux timestamps deviennent chaque start; delta source calculé depuis le prototype initial, pas depuis le premier muté. Premier nom/ID/UUID conservé, nouveaux ordinaux contigus, nom#start et UUID23..38 frais avec collision refusée. Tous payloads/clones/compteurs prêts avant mutation; pas de restauration deepcopy échangeant les objets, pas de save implicite, WAV/media/bin-parent/gain/metadata/records TOC intacts, pas de pièces supprimées créées.
+- Dix-sept tests `test_keep_clip_regions.py` (15 synthétiques / 2 natifs), plus trois comparatifs ajustés à présence de méthode : reproduction exacte du candidat à UUID fixé, deux cycles natifs, poursuite de découpe des deux headers, entrées/générateurs, bounds/widths, UTF-8/3 fragments/rates, collisions noms/UUID, hidden/group-ID-collision/overlap/fades, UUID tardif/overflow source tardif sans mutation, identité des objets/metadata. **566 tests -W error**, 53 fichiers Python3.8, 950 raises (804ValueError/88TypeError/18NotImplementedError/15OverflowError, autres inchangés). Anciens create_subclip/split/trim inchangés, leur écart d'identité noté plus haut non corrigé aveuglément. Étape34 clôturée, ne pas refaire cette paire.
+
+### Étape35 — import média PCM24 clôturé, méthode publique intégrée non publiée
+
+- Dossier `32_import_media`, paire before/after byte-identique au before compact protégé; WAV mono PCM24/48k Audio 1_01.wav identique. WAV à importer `03_audio_to_import/Audio 2_01.wav` SHA `b603d8c5e57d015eaa7f630de9eccaacc2de8741b806ad4ddfd2bcbce7b87031` : clone via helper existant, BWF/ref1729728000 conservée, UMID/stem distincts, fmt/data byte-identiques; durée8680672. Aucun WAV à créer par l'utilisateur. Script guarded destination absente/sourcehash protège tous les anciens fichiers.
+- Retour « ok c'est fait » : after172232octets SHA `d467d1d77026f1ba2b7372fd39d8a7467ce26c7c04b06c625bd9204d10417fac`; ancien clip/source100 intact, nouveauAudio2_01 complet1738456672→1747137344, copieWAV byte-identique. Bin3/catalogue2/167cibles. Parent header0000304400, UInt24duréeA+5, timestampsBWF A+8/A+12; slot opaqueA+36..47 nul pour nouvel import. Média31durée+6/3, identité+22/9 =2a+UMID16..23; détail151/4301/58, timestamps29/100/105, UUID135, UMIDtail18..49. Raw48 premierUInt32=1(indexmédia), UUID23..38; raw104 index96=1. Ne pas généraliser vers tous PCM24 ni utiliser ordinal bin2 dans le premier champ identité.
+- `prepare_api_candidate.py` externe : sourcehash/destinationabsente, WAV inspectéRIFF/fmt/data/bext, prototype strict, clones nouveaux seulement; champs opaques conservés sauf slot parent nul corroboré. Pathlabels historiques conservés, compteurs103a+1/insertionEVAW, catalogue/clipcount/event ajoutés. Filetimes/UUID générés par helpers existants, non copiés depuisoracle; anciensrecords/WAV intacts. Sortie172278octets SHA `0c0408dc85ef01fb44e026c6a211e55d8176ff82fd6971a68fea43a5f8ead7d3`, deux cyclesAPI byte-identiques. Demander ouverture/lecture des deux clips, save/fermer/rouvrir; **ne pas intégrer de méthode publique avant retour**. Tests `test_import_media_native.py`4read-only, troisfixtures locales individuellement ignorées. Suite570 -Werror,54Python3.8,950raises inchangés. Sourcept_api.py inchangé pour cette étape. Version/licence inchangées, aucun commit/push.
+- Consignes `A_LIRE.md` : ouvrir seulement02_after/import_media.ptx, importer le nouveau WAV par Copy (pas Add/Convert) dans02_after/Audio Files/Clip List, sans nouvelle piste; le placer complet sur Audio1 à1738456672→1747137344 (un trou48k après l'ancien). Ancien clip1729728100→1738408672 intact. Noms auto, pas de fade/consolidation/rename/BWF/reset. Save/fermer/rouvrir et écouter, garder tout le dossier. Attendre ce before/after avant écrire un nouvel importeur.
+- B5 principalement CLI `ptx_edit.py`, pas protection globale de save(): validateur de graphe exécuté isolément (AST de deux fonctions, aucune dépendance CLI ni écriture) sur le before natif retourne [] : **ne pas annoncer qu'il interprète mal ce corpus**. Défauts d'import à auditer : WAV sans contrôle RIFF/WAVE/taille/duplication/alignement complet, longueur média tronquée à3octets sans overflow, charset latin1 replace, tailUUID écrit sans sélection de profil, header2106/tail65 réassemblés inconditionnellement depuis recette différente des profils officiels. Le fait que le validateur de graphe passe ne valide pas ces données. Ne pas reprendre tels quels; builder float32 et relink existants restent séparés de l'import générique.
+- Retour « all good lets go » après consignes ouverture/lecture/save/réouverture. Save172230octets SHA `934718901de9cf2fa91e1f924e65dd38668af11701b8d4c834c9b0fdf744e171`, mêmes deux placements/source/filename/167cibles, deux cycles exacts. Fixture resauvegardée conservée/ignorée, aucun candidat existant régénéré.
+- `import_audio(track_name,audio_path,start_samples,prototype_clip_name,clip_name=None)` intégré : prototype parent explicite, WAV natif monoPCM24/48k déjà sous Audio Files de la session48k/23.976 little-endian. Fichier uniquement lu, aucune copie/conversion/save; retourordinalbin. Inspector strict RIFF40/dataalignement/bextUMIDpréfixe+nonzero/regn longueur+stem+deuxrefs/umidfileidentifier. DuréeUInt24, BWFUInt32, placementstart/endUInt64. Parenttype11/2628type4/55tail, metadata4403 exacte/raw48/104, cataloguedonor31/151/58/identité/timing, compteurs/noms/collisions vérifiés. Préparer médias/defs/filename/trailer/playlist surclones; allouerUUIDs avant quatreaffectations finales. Anciensevents partagés intactement dansnouvelleliste, objets/metadata intacts suréchec. Pas de tableTOCajoutée, pathlabelopaques conservés. Profil séparé `_PCM24_AUDIO_IMPORT_PROFILE`, builderfloat32 inchangé.
+- `tests/test_import_audio.py`18tests (16synthétiques/2natifs) : reproduction byte-identique du candidat validé àtime/UUIDfixes, savePT/cycles, Unicode/nomsvariables/importsuccessifavec nouveauparentprototype, Uint64placement/BWF indépendant, mauvaisparam/path/format/RIFF/bext/regn/umid/profil/groupe/fade/counters et collision/UUID tardif/event tardif atomiques. Suite588 -Werror,55Python3.8,984raises (829Value/90Type/20NI/20Overflow,autres inchangés). Ancien split/trim/create_subclip AST inchangé. Étape35 clôturée; ne pas refairetestni annoncerimportuniversel/modernes/MXF. Aucun commit/push/version/licence.
+- Fin de l'audit : établir matrice intégré/corrigé/refusé/reporté pour chaque apport; ne pas attendre indéfiniment des références modernes/MXF indisponibles ni prétendre les prendre en charge. Anciennes API inchangées et anomalies hors contribution à signaler explicitement plutôt qu'élargir silencieusement le chantier. Version/licence inchangées, aucun commit/push. L'utilisateur souhaite finir aujourd'hui; regrouper contrôles automatiques et réutiliser les références, mais pas les validations manuelles requises.
+
+### Bilan final de portée de la contribution —588tests, audit technique clôturé
+
+Révision auditée `bd07863ffc52adb5e3ada566b085bd034692ed33`; pas de remplacement
+du module ou d'intégration automatique du CLI. Les mentions « validé » ci-dessous
+se rapportent uniquement aux profils testés, pas à toutes les sessions2025/2026.
+
+| Apport | Décision et preuve actuelle |
+|---|---|
+| A1 — fades | UInt24 répété29 intégré/validé25 et23.976; compact25 et géométriespartagées non intégrés, oraclesabsents. Classification audio tail010101 historique conservée. |
+| A2 — largeurs clips | Reader compactvirtuel1001/UInt8 validé; trims enplace et conservation de plages historiques validés. 1000/4000/autreslayouts et relinkUInt8 non intégrés sans oracle. |
+| A3 — timestamps/overflow | Pas de patch des anciens split/create_subclip/trim (AST identique). Nouvelles éditions utilisent les deux timestamps définis confirmés par références natives; pas de règle universelle sentinelle/origine imposée. |
+| A4 — folders | Pistes nommées dedans/dehorsBasicFolder validées en non-régression sans patch; aucun writerFolder ni resolveranonymousfolder universel. |
+| A5 — anonymousAAF | Readerpuremonoanonymous corroboré par4miroirs intégré/validé; mixnamed/anonymous, stéréo et autreslayouts non pris en charge. Aucun import/exportAAF dansl'API. |
+| A6 — compteur1054 | Correctifparseur intégré, tests90/346 et natifs90 validés. |
+| A7 — 25fps | Moteurtimecode enum02 intégré/validé; profilsauthoring23.976 restent séparés. |
+| A8 — MXF | Reportéexplicitement, aucunfichiernative disponible; aucuneextensionMXF intégrée. |
+| B1 — routing | Lecture/sortie versbusmono/stéréo et branchesmono↔stéréo validées, contrôlesidentités/pan/codecalibration. Listegénérale get_available_outputs, hardware/multi-affectations/miroirsmodernes horssupport. |
+| B2 — Volume | Reader/writer mono+stéréo/mix validés; ordinalpiste distinctplaylist; inputs/lanes prévalidés, pasmutationpartielle. |
+| B3 — ClipGain | Readerrecordsvariables et staticwriter partagé/premierpoint validés, enveloppes noncibles conservées. Courbe en écriture et UUIDtailsmodernes non intégrés; pasdétectionheuristique -6/-22. |
+| B4 — éditiontimeline | Deleteclip ouverture/save/réouverture confirmés; trimscompacts/keepregions/importPCM24 validés. Anciens split/trim/relink conservés; CLIrestorefragments/strip-silence/indexdisquerécursif général non intégrés. Pas de besoin d'intégrer une interfaceCLI spécifique pour exposer les opérations générales vérifiées. |
+| B5 — allocation/catalogue | AppendPCM24 vérifiecataloguecontigu/trailer/counters et cloneprofilnatifs; importvalidéProTools. ValidateurgraphgénériqueCLI n'est pas une nouvelle protectionglobale de save; arborescences/multirepertoiresautres non pris en charge. |
+| B6 — Pan | Static/automation mono+L/R stéréo readers/writers intégrés/validés, inputs/canaux/lanes prévalidés. |
+| B7 — markers | Suppressionmarker avecpurgeTOC et preservationrule validée. add_marker2024 inchangé; writer2025/26 et memorylocationsriches non intégrés sansoracle. |
+| VariantesTOC/parseursd'identités | Ne pas adopter les relaxations/géométriesmodernes depuisdéclarationsseules; pipelineofficiel strict conservé, testsrelocation/composition desprofilsvalidés. |
+
+Défauts préliminaires P1 pan/Volume mutationpartielle, ClipGainUUID/sharedpoints,
+delete_markerTOC : corrigés/contournés par les writers stricts intégrés et leurs
+régressions. Le résultat ne certifie pas la contribution entière. Confirmation
+finale de l'étape32 reçue : deux sorties bienfermées/rouvertes aprèssave.
+Pas de nouvellesessionscomplexes à préparer pour les
+variantes indisponibles; les laisser explicitement reportées/exclues.
+
+### Contrôles de livraison —11octobre2026
+
+- Suite locale588avec -Werror, sans skips; copie propre horsdépôt sans PTX/WAV/configprivée :588découverts/463exécutés/125skips explicites. Aucun skip présenté comme validationnative. Trois anciennes références absolues àapplicationtierce dans test_audit remplacées par external_audit_session_1/2/3.ptx, copies des originaux conservées localement et ignorées individuellement.
+- SyntaxeAST Python3.8 pour56sources(module/tests/checker), analysePyflakes module/tests/checker propre, aucunsymbole public absent duREADME ni méthodeclassdupliquée. Trois imports de test inutilisés retirés; ancienssplit/trim/create_subclip restent AST identiques auHEAD. Diff --check sans erreur (warnings CRLF habituels).
+- `.github/workflows/tests.yml` ajouté : Windows/Linux3.8/3.11/3.13 surpush/PR/workflow_dispatch, permissionscontentsread/persistcredentialsfalse/actionsSHApinnés; suite -Werror et build/check/install horscheckout. **Workflow distant non exécuté ici**, attendre le premier push pour ses résultats réels; AST3.8 n'est pas exécution3.8.
+- `MANIFEST.in` et scripts/check_distribution.py : module exact/version/noticesLICENSE/COPYING/NOTICE/metadataRequiresPython>=3.8/aucune dépendanceruntime; aucun PTX/WAV/média/.env/.git/cache dans wheel/sdist. Construction wheel/sdist et installation/import réussis en venv temporaire horsrepo; environnementglobal non modifié. Outillage build/pyflakes de développement, pas dépendanceAPI. Les avertissements du backend moderne sur la forme legacy des métadonnées de licence sont nonbloquants; migration séparée àplanifier sans supprimer le supportPython3.8.
+- Espace temporaire `C:\Users\sebed\AppData\Local\Temp\pt-api-delivery-483ccd34a5814c1ea5c5d07ee372775f` : copieportable, envoutillage/installation et artefactsbuild, aucun médiautilisateur. Références partagées et sourcesrestent intacts. Version/licence inchangées1.5.2/LGPL2.1-or-later; mainteneur choisira numéro de release puis devra aligner __version__/pyproject avanttag. Ne pasfaire decommit/push àsa place.
 
 ### Version publiée
 

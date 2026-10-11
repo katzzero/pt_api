@@ -16,11 +16,18 @@ BEFORE = FIXTURES / 'native_clip_gain_mixed_before.ptx'
 AFTER = FIXTURES / 'native_clip_gain_mixed_after.ptx'
 RESAVED = FIXTURES / 'native_clip_gain_mixed_pt_resaved.ptx'
 SHARED_RESAVED = FIXTURES / 'native_clip_gain_mixed_shared_pt_resaved.ptx'
+FIRST_RESAVED = FIXTURES / 'native_clip_gain_mixed_first_pt_resaved.ptx'
+THREE_BEFORE = FIXTURES / 'native_clip_gain_three_before.ptx'
+THREE_AFTER = FIXTURES / 'native_clip_gain_three_after.ptx'
+THREE_RESAVED = FIXTURES / 'native_clip_gain_three_pt_resaved.ptx'
 STATIC_META = bytes.fromhex('0146010016000000000001000000040000000000000000000000')
 # Actual native four-node envelope, including the exact mouse-entered values.
 ENVELOPE = bytes.fromhex(
     '014601002e0000000000040000000400030000000000'
     '0000000000000000607701000000000080dd05009b73bec040cc08000000c9b6')
+# Native record after deleting only the 96096-sample point from ENVELOPE.
+ENVELOPE_THREE = (bytes.fromhex('01460100260000000000030000000400020000000000')
+                  + ENVELOPE[22:30] + ENVELOPE[38:])
 
 
 def static(value):
@@ -89,11 +96,12 @@ class MixedClipGainTests(unittest.TestCase):
             self.assertEqual([record for _, record in actual], expected)
 
     def test_signatures_inside_node_data_do_not_create_record_boundaries(self):
-        envelope = bytearray(ENVELOPE)
-        envelope[-4:] = b'\x01\x46\x01\x00'  # Finite Float32, not another record.
-        s, _, _, _ = mixed_session([bytes(envelope), static(3)])
-        self.assertEqual(s.set_clip_gain('A', 6), 1)
-        self.assertEqual(s._validated_clip_gain_dictionary()[2][0][1], envelope)
+        for source in (ENVELOPE, ENVELOPE_THREE):
+            envelope = bytearray(source)
+            envelope[-4:] = b'\x01\x46\x01\x00'  # Finite Float32, not another record.
+            s, _, _, _ = mixed_session([bytes(envelope), static(3)])
+            self.assertEqual(s.set_clip_gain('A', 6), 1)
+            self.assertEqual(s._validated_clip_gain_dictionary()[2][0][1], envelope)
 
     def test_shared_static_point_is_cloned_and_other_definition_keeps_old_gain(self):
         s, d, a, b = mixed_session(indexes=(1, 1))
@@ -150,34 +158,34 @@ class MixedClipGainTests(unittest.TestCase):
             with self.assertRaises(ValueError): s.set_clip_gain('A', 6)
             self.assertEqual(snapshot(s), before, variant)
 
-    def test_unsupported_three_node_record_is_not_guessed(self):
-        raw = bytearray(ENVELOPE[:-8])
-        struct.pack_into('<I', raw, 4, 0x26)
-        struct.pack_into('<I', raw, 10, 3)
-        struct.pack_into('<I', raw, 16, 2)
-        s, _, _, _ = mixed_session([raw, static(3)])
-        before = snapshot(s)
-        with self.assertRaisesRegex(NotImplementedError, 'record size 0x26'):
-            s.set_clip_gain('A', 6)
-        self.assertEqual(snapshot(s), before)
+    def test_unverified_two_and_five_node_records_are_not_guessed(self):
+        for count, size, nodes in ((2, 0x1e, ENVELOPE[22:38]),
+                                    (5, 0x36, ENVELOPE[22:] + struct.pack('<If', 700000, 0))):
+            raw = struct.pack('<4sI2xIHI2x', b'\x01\x46\x01\x00', size, count, 4, count - 1) + nodes
+            s, _, _, _ = mixed_session([raw, static(3)])
+            before = snapshot(s)
+            with self.assertRaisesRegex(NotImplementedError, 'record size 0x%x' % size):
+                s.set_clip_gain('A', 6)
+            self.assertEqual(snapshot(s), before)
 
     def test_envelope_header_count_flags_reserved_and_nodes_are_validated(self):
-        for offset in (0, 8, 10, 14, 16, 20, 22):
-            rows = bytearray(ENVELOPE)
-            rows[offset] ^= 1
-            s, _, _, _ = mixed_session([static(3), rows], (0, 1))
-            before = snapshot(s)
-            with self.assertRaises(ValueError): s.set_clip_gain('A', 6)
-            self.assertEqual(snapshot(s), before)
-        for variant in ('duplicate', 'descending', 'nan', 'inf'):
-            rows = bytearray(ENVELOPE)
-            if variant == 'duplicate': struct.pack_into('<I', rows, 30, 0)
-            elif variant == 'descending': struct.pack_into('<I', rows, 38, 1)
-            else: struct.pack_into('<f', rows, 50, float(variant))
-            s, _, _, _ = mixed_session([rows, static(3)])
-            before = snapshot(s)
-            with self.assertRaises(ValueError): s.set_clip_gain('A', 6)
-            self.assertEqual(snapshot(s), before)
+        for envelope in (ENVELOPE, ENVELOPE_THREE):
+            for offset in (0, 8, 10, 14, 16, 20, 22):
+                rows = bytearray(envelope)
+                rows[offset] ^= 1
+                s, _, _, _ = mixed_session([static(3), rows], (0, 1))
+                before = snapshot(s)
+                with self.assertRaises(ValueError): s.set_clip_gain('A', 6)
+                self.assertEqual(snapshot(s), before)
+            for variant in ('duplicate', 'descending', 'nan', 'inf'):
+                rows = bytearray(envelope)
+                if variant == 'duplicate': struct.pack_into('<I', rows, 30, 0)
+                elif variant == 'descending': struct.pack_into('<I', rows, 38, 1)
+                else: struct.pack_into('<f', rows, len(rows) - 4, float(variant))
+                s, _, _, _ = mixed_session([rows, static(3)])
+                before = snapshot(s)
+                with self.assertRaises(ValueError): s.set_clip_gain('A', 6)
+                self.assertEqual(snapshot(s), before)
 
     def test_malformed_static_record_in_other_definition_precedes_mutation(self):
         for offset in (0, 8, 10, 14, 16, 20, 22):
@@ -287,13 +295,52 @@ class MixedClipGainTests(unittest.TestCase):
             elif variant == 'bad_static':
                 d.items[0][4 + len(ENVELOPE) + 8] ^= 1
             else:
-                row = bytearray(ENVELOPE[:-8])
-                struct.pack_into('<I', row, 4, 0x26)
+                row = bytearray(ENVELOPE[:-16])
+                struct.pack_into('<I', row, 4, 0x1e)
+                struct.pack_into('<I', row, 10, 2)
+                struct.pack_into('<I', row, 16, 1)
                 d.items[0] = bytearray(struct.pack('<I', 2) + static(3) + row)
             before = snapshot(s)
             error = NotImplementedError if variant == 'unknown_record' else ValueError
             with self.assertRaises(error): s.set_clip_gain('A', 6)
             self.assertEqual(snapshot(s), before, variant)
+
+    def test_three_and_four_node_records_interleave_with_only_one_static_float_changed(self):
+        for rows, index in (([ENVELOPE_THREE, static(3)], 1),
+                            ([static(3), ENVELOPE_THREE], 0),
+                            ([ENVELOPE, ENVELOPE_THREE, static(3)], 2),
+                            ([ENVELOPE_THREE, static(3), ENVELOPE], 1)):
+            s, _, _, _ = mixed_session(rows, (index, 1 if index == 0 else 0))
+            reference = copy.deepcopy(s)
+            raw = bytearray(reference._root_blocks(0x2637)[0].items[0])
+            struct.pack_into('<f', raw, 4 + sum(len(r) for r in rows[:index]) + 26, 6)
+            reference._root_blocks(0x2637)[0].items[0] = raw
+            self.assertEqual(s.set_clip_gain('A', 6), index)
+            self.assertEqual(snapshot(s), snapshot(reference))
+            original = snapshot(s)
+            with self.assertRaisesRegex(NotImplementedError, 'envelope'):
+                s.set_clip_gain('B', 6)
+            self.assertEqual(snapshot(s), original)
+
+    def test_three_node_mixed_first_and_shared_gain_preserve_both_envelopes(self):
+        for target_index in (-1, 2):
+            s, d, a, b = mixed_session([ENVELOPE_THREE, ENVELOPE, static(3)], (target_index, 2))
+            clips = s._root_blocks(0x262a)[0]
+            for name, clip_id, index in (('C', 2, 0), ('D', 3, 1)):
+                definition, payload = make_clip(name, clip_id)
+                struct.pack_into('<i', payload.items[0], len(payload.items[0]) - 6, index)
+                clips.items.append(definition)
+            struct.pack_into('<I', clips.items[0], 0, 4)
+            raw = bytes(d.items[0])
+            self.assertEqual(s.set_clip_gain('A', 6), 3)
+            self.assertEqual(bytes(d.items[0][4:-30]), raw[4:])
+            self.assertEqual(bytes(d.items[0][-30:]), static(6))
+            self.assertEqual((gain_index(a), gain_index(b)), (3, 2))
+            expected = {'A': static(6), 'B': static(3), 'C': ENVELOPE_THREE, 'D': ENVELOPE}
+            self.assertEqual(gains_by_name(s), expected)
+            for value in (-10, 6): s.set_clip_gain('A', value)
+            self.assertEqual(len(s._validated_clip_gain_dictionary()[2]), 4)
+            self.assertEqual(gains_by_name(s), expected)
 
 
 @unittest.skipUnless(BEFORE.exists() and AFTER.exists(), 'Local native mixed Clip Gain pair absent')
@@ -446,6 +493,35 @@ class NativeMixedClipGainTests(unittest.TestCase):
             s.save(str(out))
             self.assertEqual(out.read_bytes(), original)
 
+    @unittest.skipUnless(FIRST_RESAVED.exists() and SHARED_RESAVED.exists(), 'Local native first-gain references absent')
+    def test_pro_tools_resaved_first_gain_keeps_curve_and_reuses_native_point(self):
+        s = ProToolsSession(str(FIRST_RESAVED))
+        base = ProToolsSession(str(SHARED_RESAVED))
+        expected = gains_by_name(base)
+        expected['MEDIA-01'] = static(-3)
+        self.assertEqual(gains_by_name(s), expected)
+        self.assertEqual(s.get_clips(), base.get_clips())
+        self.assertEqual(s.get_tracks(), base.get_tracks())
+        self.assertEqual(s.get_timeline_clips(), base.get_timeline_clips())
+        self.assertEqual(pointer_rows(s), pointer_rows(base))
+        blocks = clip_payloads(s)
+        self.assertNotEqual(gain_index(blocks['MEDIA']), gain_index(blocks['MEDIA-01']))
+        count = len(s._validated_clip_gain_dictionary()[2])
+        original = FIRST_RESAVED.read_bytes()
+        with tempfile.TemporaryDirectory() as folder:
+            out = Path(folder) / 'cycle.ptx'
+            for _ in range(2):
+                s.save(str(out))
+                self.assertEqual(out.read_bytes(), original)
+                s = ProToolsSession(str(out))
+            for name, value in (('MEDIA', 5), ('MEDIA-01', 6), ('MEDIA-01', -10),
+                                ('MEDIA', 6), ('MEDIA-01', -3)):
+                s.set_clip_gain(name, value)
+            self.assertEqual(gains_by_name(s), expected)
+            self.assertEqual(len(s._validated_clip_gain_dictionary()[2]), count)
+            s.save(str(out))
+            self.assertEqual(out.read_bytes(), original)
+
     @unittest.skipUnless(SHARED_RESAVED.exists(), 'Local Pro Tools-resaved shared gain output absent')
     def test_controlled_missing_gain_reference_appends_static_and_preserves_curve(self):
         # Known historical -1 sentinel constructed on the validated native session.
@@ -483,6 +559,103 @@ class NativeMixedClipGainTests(unittest.TestCase):
             self.assertEqual(len(s._validated_clip_gain_dictionary()[2]), count + 1)
             s.save(str(out))
             self.assertEqual(out.read_bytes(), produced)
+
+
+@unittest.skipUnless(THREE_BEFORE.exists() and THREE_AFTER.exists(), 'Local native three-node Clip Gain pair absent')
+class NativeThreeNodeClipGainTests(unittest.TestCase):
+    @unittest.skipUnless(THREE_RESAVED.exists(), 'Local Pro Tools-resaved three-node output absent')
+    def test_native_resave_preserves_three_nodes_and_reversible_static_updates(self):
+        s = ProToolsSession(str(THREE_RESAVED))
+        base = ProToolsSession(str(THREE_AFTER))
+        expected = gains_by_name(base)
+        expected['MEDIA-01'] = static(3)
+        self.assertEqual(gains_by_name(s), expected)
+        self.assertEqual(s.get_clips(), base.get_clips())
+        self.assertEqual(s.get_tracks(), base.get_tracks())
+        self.assertEqual(s.get_timeline_clips(), base.get_timeline_clips())
+        self.assertEqual(pointer_rows(s), pointer_rows(base))
+        original = THREE_RESAVED.read_bytes()
+        count = len(s._validated_clip_gain_dictionary()[2])
+        with tempfile.TemporaryDirectory() as folder:
+            out = Path(folder) / 'cycle.ptx'
+            for _ in range(2):
+                s.save(str(out))
+                self.assertEqual(out.read_bytes(), original)
+                s = ProToolsSession(str(out))
+            for value in (-10, -3, 3):
+                s.set_clip_gain('MEDIA-01', value)
+            self.assertEqual(gains_by_name(s), expected)
+            self.assertEqual(len(s._validated_clip_gain_dictionary()[2]), count)
+            state = snapshot(s)
+            with self.assertRaisesRegex(NotImplementedError, 'envelope'):
+                s.set_clip_gain('MEDIA_01-01', 6)
+            self.assertEqual(snapshot(s), state)
+            s.save(str(out))
+            self.assertEqual(out.read_bytes(), original)
+
+    def test_native_pair_removes_only_requested_point_despite_index_reordering(self):
+        before, after = (ProToolsSession(str(p)) for p in (THREE_BEFORE, THREE_AFTER))
+        expected = gains_by_name(before)
+        self.assertEqual(expected['MEDIA_01-01'], ENVELOPE)
+        expected['MEDIA_01-01'] = ENVELOPE_THREE
+        self.assertEqual(gains_by_name(after), expected)
+        self.assertEqual(len(ENVELOPE_THREE), 46)
+        self.assertEqual([struct.unpack_from('<I', ENVELOPE_THREE, 22 + 8 * i)[0]
+                          for i in range(3)], [0, 384384, 576576])
+        self.assertEqual(after.get_clips(), before.get_clips())
+        self.assertEqual(after.get_tracks(), before.get_tracks())
+        self.assertEqual(after.get_timeline_clips(), before.get_timeline_clips())
+        self.assertEqual(pointer_rows(after), pointer_rows(before))
+
+    def test_native_static_update_changes_only_one_float_and_is_exactly_reversible(self):
+        s = ProToolsSession(str(THREE_AFTER))
+        reference = copy.deepcopy(s)
+        index = gain_index(clip_payloads(reference)['MEDIA-01'])
+        d, raw, records = reference._validated_clip_gain_dictionary()
+        changed = bytearray(raw)
+        struct.pack_into('<f', changed, records[index][0] + 26, 3)
+        d.items[0] = changed
+        original = snapshot(s)
+        self.assertEqual(s.set_clip_gain('MEDIA-01', 3), index)
+        self.assertEqual(snapshot(s), snapshot(reference))
+        self.assertEqual(gains_by_name(s)['MEDIA_01-01'], ENVELOPE_THREE)
+        self.assertEqual(s.set_clip_gain('MEDIA-01', -3), index)
+        self.assertEqual(snapshot(s), original)
+
+    def test_native_noop_and_modified_cycles_preserve_curve_pointers_and_restore_file(self):
+        with tempfile.TemporaryDirectory() as folder:
+            out = Path(folder) / 'cycle.ptx'
+            for source in (THREE_BEFORE, THREE_AFTER):
+                s = ProToolsSession(str(source))
+                original = source.read_bytes()
+                for _ in range(2):
+                    s.save(str(out))
+                    self.assertEqual(out.read_bytes(), original)
+                    s = ProToolsSession(str(out))
+            s = ProToolsSession(str(THREE_AFTER))
+            expected = gains_by_name(s)
+            expected['MEDIA-01'] = static(3)
+            clips, tracks, rows = s.get_timeline_clips(), s.get_tracks(), pointer_rows(s)
+            count = len(s._validated_clip_gain_dictionary()[2])
+            s.set_clip_gain('MEDIA-01', 3)
+            s.save(str(out))
+            produced = out.read_bytes()
+            for _ in range(2):
+                s = ProToolsSession(str(out))
+                self.assertEqual(gains_by_name(s), expected)
+                self.assertEqual(s.get_timeline_clips(), clips)
+                self.assertEqual(s.get_tracks(), tracks)
+                self.assertEqual(pointer_rows(s), rows)
+                s.save(str(out))
+                self.assertEqual(out.read_bytes(), produced)
+            state = snapshot(s)
+            with self.assertRaisesRegex(NotImplementedError, 'envelope'):
+                s.set_clip_gain('MEDIA_01-01', 6)
+            self.assertEqual(snapshot(s), state)
+            for value in (-10, 3, -3): s.set_clip_gain('MEDIA-01', value)
+            self.assertEqual(len(s._validated_clip_gain_dictionary()[2]), count)
+            s.save(str(out))
+            self.assertEqual(out.read_bytes(), THREE_AFTER.read_bytes())
 
 
 if __name__ == '__main__':

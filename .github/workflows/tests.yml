@@ -1,0 +1,44 @@
+name: Regression tests and package checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.8', '3.11', '3.13']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Standard-library regression suite (private native fixtures optional)
+        run: python -W error -m unittest discover -s tests
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.11'
+      - run: python -m pip install build
+      - run: python -m build
+      - run: python scripts/check_distribution.py dist
+      - name: Install and import wheel outside the checkout
+        run: |
+          python -m pip install --no-deps dist/*.whl
+          cd "${RUNNER_TEMP}"
+          python -I -c "import pt_api; from importlib.metadata import version; assert pt_api.__version__ == version('pt_api'); assert hasattr(pt_api.ProToolsSession, 'import_audio'); print(pt_api.__version__)"

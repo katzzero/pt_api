@@ -1,10 +1,12 @@
-# Architecture logicielle de `pt_api` 1.5.2
+# Architecture logicielle de `pt_api` 1.6.0
 
 Ce document donne un survol global du logiciel. Les structures binaires, offsets, flags et messages d'erreur appartiennent à [`pt_format_specs.md`](pt_format_specs.md), qui est la spécification technique normative. La surface publique et ses limitations sont résumées dans [`README.md`](README.md).
 
 ## Objectif et périmètre
 
 `pt_api` est une bibliothèque Python autonome qui lit et modifie des sessions Pro Tools `.ptx` sans Pro Tools, SDK ou service externe. Elle travaille sur des sessions existantes, conserve les données binaires qu'elle ne comprend pas et refuse les dispositions ambiguës plutôt que de les réécrire par supposition.
+
+Les garde-fous portent sur les invariants du schéma, pas sur les valeurs des exemples d'audit. Les noms/positions/valeurs variables se généralisent dans leurs bornes documentées; une géométrie inconnue ne se généralise pas par supposition. Aucun mode « force » n'est ajouté. Pour le Pan statique, les resolvers reçoivent désormais `static_target` : la cible conserve son profil strict, tandis que les autres pistes peuvent porter une courbe Pan entièrement validée par le décodeur existant et conservée sans mutation. Les validations communes d'identité, de slot, d'état et de Volume restent inchangées.
 
 - Langage : Python 3.8 ou plus récent.
 - Dépendances d'exécution : bibliothèque standard uniquement.
@@ -13,6 +15,28 @@ Ce document donne un survol global du logiciel. Les structures binaires, offsets
 - Interface : API Python; le petit point d'entrée CLI sert seulement au test load/save.
 
 ## Organisation du dépôt
+
+Correctif non publié de marqueurs : `_prepare_legacy_marker_population_flag()`
+prépare sans mutation le seul octet de population de la règle zéro dans le
+catalogue legacy `0x2519/0x251b/0x251c`. Ajout et suppression l'affectent après
+leurs validations/préparations, avec le payload de marqueur inchangé. Un catalogue
+optionnel absent conserve l'ancien contrat; un catalogue présent ambigu/inconnu
+est refusé, pas réparé. L'import direct du profil historique est validé dans
+Pro Tools 2024.3.1, sans resauvegarde préalable de la source API. La sauvegarde
+native normalise la structure du marqueur sans changer son nom/position;
+cette forme se lit et se resauvegarde sans mutation dans l'API, mais n'est pas
+un nouveau modèle d'écriture. L'écriture moderne à deux propriétés n'est pas
+intégrée. Une paire native confirme désormais les deux copies du commentaire
+legacy : le writer ajoute les champs UTF-8 préfixés UInt32 sur son prototype
+existant; `_decode_legacy_marker_comment()` corrobore tailles/copies/enveloppe
+depuis l'arbre courant. `get_markers(include_comments=True)` expose ce champ
+en lecture seule; le résultat par défaut reste inchangé. Le writer prépare et
+valide le marqueur complet avant toute insertion. La sortie API commentée
+est validée dans Pro Tools après ouverture/vérification/save/réouverture;
+sa sauvegarde native conserve les commentaires et timestamps exacts, et
+deux cycles API sont byte-identiques. Le décodeur ne convertit ni les formes
+compactes ni celles à deux propriétés. `delete_marker()` n'est pas élargi aux
+commentaires non vides.
 
 | Élément | Responsabilité |
 |---|---|
@@ -84,6 +108,113 @@ Le correctif local non publié protège aussi les préfixes bruts explicitement 
 L'étape 2 non publiée ajoute le mapping natif 25 fps non-drop dans ce moteur partagé, sans autre changement de flux. Les lecteurs et mutations déjà fondés sur ce moteur en bénéficient; les writers de création à profil 48 kHz / 23.976 conservent leurs validations indépendantes. Les tests temporels, la lecture native et le déplacement écrit d'une image sont validés, y compris l'ouverture/sauvegarde/réouverture dans Pro Tools puis les cycles API sur le fichier resauvegardé.
 
 ### `ProToolsSession`
+
+Le parsing/contrôle des noms principaux est partagé par
+`_validated_main_playlist_records()` : compteurs de map/événements, bornes et
+UTF-8 sont validés avant résolution ou écriture. `_validated_main_playlists()`
+garde son défaut strict pour les writers; en lecture autorisée, les noms mono
+anonymes ou mixtes sont corroborés par `_validated_audio_playlist_names()` et
+les identités Audio indépendantes existantes. Aucun nom n'est deviné depuis un
+clip, une égalité de comptes ou le tampon de fichier ancien.
+
+L'extension non publiée `fill_anonymous_playlist_names()` utilise ces mêmes
+records, autorise les largeurs mono/stéréo déjà vérifiées et exige l'égalité de
+tous les noms existants. Elle prépare les seuls en-têtes anonymes avant toute
+affectation et conserve leur compteur, événements, objets et autres racines.
+Ce n'est pas un renommage de piste ni un Save As/convertisseur AAF; l'écriture
+du candidat mono mixte est validée dans Pro Tools, sauvegarde native et cycles
+API exacts compris. La composition
+stéréo est couverte automatiquement par les schémas d'identité existants, sans
+revendiquer un nouvel oracle AAF stéréo.
+
+La résolution Volume existante corrobore les identités live du slot et des
+miroirs, puis les largeurs et les noms des playlists. Elle peut donc être
+composée avec le remplissage explicite précédent sans introduire le helper
+privé `_volume_lanes` du contributeur, son scan du cache source ou un repli
+sur ordinal en cas de désaccord. Quatre régressions couvrent cette composition,
+le refus des identités contradictoires et la restauration native exacte.
+Le ciblage de la sortie Volume AAF est validé dans Pro Tools; la sauvegarde
+native conserve les autres lanes et la géométrie audio, avec cycles API exacts.
+Une position déplacée manuellement par l'utilisateur est conservée telle
+quelle, sans compensateur ni modification du resolver. La méthode
+historique `add_volume_node` reste distincte et n'est pas élargie.
+
+La suppression non publiée `delete_marker(index=None, name=None)` est une
+mutation distincte de l'ajout et de la lecture filtrée. Elle valide une règle
+legacy unique, tous ses points via `_validated_deletable_point_marker()`, les
+critères exacts et les références avant de préparer compteur/trailer/keep-list
+et métadonnées de suppression. Une fois tous les contrôles terminés, elle
+remplace les items de la règle et enregistre les offsets/types des sous-arbres
+retirés; `save()` purge leurs records TOC avec le pipeline existant. Survivants
+et champs opaques sont conservés, sans renumérotation, UI/UUID copiés depuis
+un save natif ou conversion temporelle. Les profils range/modernes/assignments
+autres que zéro sont hors support. Comparaisons natives non vide/vide et
+ouverture/lecture/sauvegarde/réouverture des deux sorties API confirmées.
+Les saves natifs conservent les survivants exacts/audio/167 cibles, passent
+des cycles no-op byte-identiques et permettent la suppression des derniers
+points sans renumérotation. Quinze régressions, suite517; étape clôturée.
+
+La suppression de placement `delete_clip(clip_name)` est distincte de la
+suppression de pistes et de la dissolution de groupes. Son writer validé non
+publié valide nom/placement audio, association des fades et table de
+pointeurs, puis prépare la playlist, le dictionnaire vide si le seul fade-out
+natif UInt24 est retiré, et les offsets/types de tous les sous-arbres supprimés.
+Les affectations ne commencent qu'après tous les contrôles; le pipeline TOC
+existant purge les références à la sauvegarde. Définitions/bin, gain, médias,
+pistes et objets survivants restent intacts. Aucune réindexation de géométries
+ou conversion de crossfade n'est inférée. Seize régressions, suite533;
+ouverture et saves natifs des deux sorties vérifiés, bin/gain/media/167 cibles
+préservés et quatre cycles supplémentaires exacts. Pro Tools rafraîchit des
+identités opaques sans changer la géométrie; pas de transposition au writer.
+La réouverture des deux sorties après sauvegarde est confirmée le11octobre;
+étape32 clôturée sans élargissement du profil ni nouveau changement de code.
+
+Les trims en place non publiés `trim_clip_head()`/`trim_clip_tail()` passent
+par `_trim_clip_inplace()`, sans changer le writer historique créant un
+sous-clip. Un cut absolu et une cible unique sont validés; le seul profil
+compact natif corroboré exige des timestamps définis non déplacés, pas de
+gain/fade ni référence timeline cachée. La taille du bloc et ses champs
+opaques/nom/identité restent fixes. Head prépare définition et événement
+avant affectation, tail prépare seulement la longueur; pas d'allocation de
+backup ni suppression/compaction/TOC modifiée. Treize tests (suite546), payloads
+cibles exacts aux oracles natifs et cycles byte-identiques. Les deux sorties
+ont été validées dans Pro Tools; leurs saves natifs conservent positions,
+offsets, parent, WAV et 167 cibles, puis passent de nouveaux cycles exacts
+et compositions en mémoire. Cela ne valide pas les autres profils ni la
+conservation de plusieurs plages, traitée séparément ci-dessous.
+
+Conservation de plages : `keep_clip_regions()` intégré après validation
+Pro Tools du candidat, construction entière avant affectations sans rollback
+remplaçant les objets de l'appelant. Bornes UInt32 absolues triées, cible unique,
+profil virtuel historique strict sans gain/fade/chevauchement/référence cachée.
+La paire confirme source/longueur 1/2 et 3/2 octets, timestamps tous deux
+définis égaux au placement et UUID dans le record d'identité de 48 octets,
+pas dans la queue audio. Le candidat construit les deux payloads depuis le
+prototype non modifié, conserve le premier ordinal, ajoute un second ordinal
+et adapte seulement les compteurs bin/playlist. Pas de création des fragments
+supprimés, de fade ni de record TOC. Le writer conserve le premier nom/ID/UUID,
+nomme les suivants par nom source et sample de début, clone depuis le prototype
+intact et place les UUID dans raw48 +23..+38. Source UInt8 ou UInt24, durée
+UInt16 ou UInt24; dépassement UInt24 refusé, ancien writer de sous-clip inchangé.
+Vingt tests (17 writer / 3 comparatifs, suite566) contrôlent géométrie/champs/
+identités/parents/autres roots, reproduction entière du candidat validé,
+save natif, cycles/compositions, collisions et échecs tardifs atomiques.
+Import média générique du CLI contrib non intégré. `import_audio()` offre
+une branche d'ajout distincte, native-validée, pour WAV Pro Tools monoPCM24/48k
+et session48k/23.976 little-endian. Le client copie lui-même son WAV sous
+Audio Files; l'API ne fait qu'inspecter RIFF/fmt40/data/BWF/regn/UMID en lecture,
+corroborer un prototype parent explicitement nommé et les catalogues courants,
+puis préparer les clones, noms/compteurs et événement avant quatre affectations.
+Les anciens objets d'événement et records média/définition restent intacts;
+aucune restauration par remplacement global de l'arbre n'est nécessaire.
+Profil parent0000304400, média31/détail151/58, duréeUInt24 et référencesBWF
+UInt32 indépendantes du placementUInt64. Raw48 premierUInt32=indexmédia,
+pas ordinalbin. Champs opaques conservés sauf slot parent nul corroboré;
+UUIDs frais sans collision. Retour nouvelIDclip; aucun save/copie/conversion.
+Target avec fades/groupes et profils inconnus refusés. Quatre tests comparatifs
+et dix-huit tests writer (16 synthétiques/2 natifs) couvrent reproduction entière
+du candidat validé, saveProTools/cycles, imports successifs/Unicode et échecs
+tardifs atomiques. Suite588. Builder float32 et anciens writers inchangés.
 
 `ProToolsSession` est la façade de haut niveau. Elle possède :
 
@@ -242,13 +373,174 @@ référence native validée, pas présenté comme une paire before/after native.
 
 La branche suivante réutilise l'ajout statique pour une cible d'index historique
 -1 dans un dictionnaire mixte. Un record est ajouté à la fin et seule la cible
-est reliée au nouvel ordinal. Elle attend sa validation manuelle dédiée;
+est reliée au nouvel ordinal. Son ouverture et sa sauvegarde native sont confirmées;
 la référence sans gain est construite avec la sentinelle déjà vérifiée.
 Plusieurs clips d'index -1 ne sont pas un partage de point : chacun reçoit son
 nouveau record indépendamment. Les mises à jour ultérieures ne réallouent pas.
-Aucun resolver heuristique UUID ni writer d'enveloppe n'est ajouté. Les 26
-tests Clip Gain mixtes portent la suite à 412 tests; le pipeline de sauvegarde
+Aucun resolver heuristique UUID ni writer d'enveloppe n'est ajouté. La sauvegarde
+native compacte/réordonne les points, sans altérer les gains, la courbe ou les
+placements; ses cycles et compositions API sont exacts. Les 33
+tests Clip Gain mixtes portent la suite à 419 tests; le pipeline de sauvegarde
 et les méthodes Volume ne changent pas.
+
+La comparaison native suivante corrobore une courbe à trois nœuds : record
+46 octets, taille 0x26, header exact/count 3/segments 2. Le parseur borné
+reconnaît explicitement ce profil en plus des quatre nœuds, sans accepter un
+nombre arbitraire de points. Les nœuds sont prévalidés, puis la courbe est
+conservée byte-identique; aucune API d'édition d'enveloppe n'est ajoutée.
+Le writer statique existant reste inchangé. Sa sortie à cible -3→+3, un seul
+octet chiffré modifié et six cycles exacts sur paire/sortie, est validée dans
+Pro Tools. Sa sauvegarde réordonne les records sans altérer les gains/courbes;
+deux nouveaux cycles et compositions restituent le fichier natif entier. Les profils deux/cinq nœuds et UUID modernes restent refusés/non pris
+en charge respectivement.
+
+### Lecture seule du Pan statique mono — non publié
+
+`get_track_pan(track_name)` lit uniquement l'arbre courant. Le helper
+`_validated_mono_pan_tracks()` (mode statique par défaut) réutilise les identités/largeurs Audio
+nommées et la validation d'état principal/Volume déjà corroborées. Il associe
+les slots aux pistes, pas aux playlists de canaux : une piste mono après une
+stéréo conserve son bon ordinal. Tous les conteneurs mono sont validés avant
+sélection du nom unique; les témoins stéréo ne sont pas décodés.
+
+Le premier conteneur Pan peut être vide ou contenir exactement la lane
+statique observée, avec son header complet et sample initial zéro. Le second
+conteneur mono doit être vide. Valeur Int16 signée -100..100; absence → None,
+centre → 0. Cible stéréo, automation de la cible ou géométrie inconnue refusées. Aucun
+scan de signature, ancienne donnée `self.data`, mutation ou save implicite.
+Le profil exige aussi les autres états et enveloppes Volume valides : cette
+dépendance volontairement conservatrice n'est pas un lecteur Pan universel.
+
+La paire native centre→L50 corrobore -50 à +26 de la lane et deux champs
+Int32 corrélés dans le `0x1029` cible de 279 octets, à +13/+99. Ces derniers
+ne sont ni lus comme valeur Pan ni écrits par ce lecteur; aucun rôle général
+de cache/fader n'est inféré. Dix tests (huit synthétiques/deux natifs locaux)
+portent la suite à 429; quatre cycles exacts sur la paire. Aucun writer Pan,
+lecteur Pan stéréo ou automation Pan intégré à cette étape.
+
+### Écriture du Pan statique mono — non publiée, validée dans Pro Tools
+
+`set_track_pan(track_name, left, right=None)` partage avec le lecteur
+`_validated_static_pan_target()` (branche mono) : validation complète du profil live,
+nom exact, largeur mono et sélection du slot corroboré. Entier non booléen
+-100..100, canal droit non supporté. Une lane statique existante est exigée;
+aucune création ni collapse d'automation. Le payload est
+préparé puis remplacé une fois, seul Int16 +26 modifié. Retour 1/0,
+pas de save implicite; tous les refus précèdent la mutation, y compris un
+paramètre droit invalide ou une autre piste malformée.
+
+Les objets de lane, états UI opaques, autres automations, routing/médias et
+métadonnées de suppression sont préservés. L'essai isolé de lane a été
+ouvert/lu/sauvegardé/rouvert dans Pro Tools; la nouvelle sauvegarde native
+conserve la valeur et toutes les autres données audio. Pro Tools actualise
+les deux champs UI corrélés à la sauvegarde, mais le writer ne reproduit pas
+cette opération. Deux cycles exacts et compositions restituent tout le
+fichier natif. Dix régressions (7 synthétiques/3 natives locales), suite 439;
+la lecture et l'écriture stéréo distinctes sont décrites ci-dessous;
+la lecture et l'écriture d'automation Pan mono sont décrites séparément ci-dessous.
+
+### Lecture du Pan statique gauche/droite — non publiée
+
+`get_track_pan_lr(track_name)` réutilise la validation commune des noms et
+le resolver mono/stéréo de l'arbre courant. Le helper mono corrobore les
+identités/largeurs/state/Volume et pans mono; le nouveau lecteur valide
+ensuite tous les pans stéréo avant résultat filtré. Deux conteneurs directs
+aux positions corroborées 8/9, chacun à lane statique exacte de 30 octets;
+aucune recherche GUID/signature, ancien offset ou lecture UI.
+
+Tuple (gauche, droite) stéréo, (pan, None) mono, (None, None) mono sans
+lane vérifiée. Stéréo sans deux lanes, automation de la cible et autres géométries sont
+refusées, sans défaut déduit. Une autre piste malformée bloque le résultat.
+Un slot est une piste, pas une playlist de canal; les stéréo premières,
+adjacentes et suivies d'une mono sont testées. Aucun changement du writer
+mono ni de ses restrictions par ce lecteur, aucune mutation/save implicite.
+
+Une paire native confirme l'edit gauche seul et la droite inchangée;
+autres données et quatre cycles API exacts. Dix nouvelles régressions
+(8 synthétiques/2 natives locales), suite 449. Aucune copie no-op à valider
+manuellement pour ce seul lecteur; l'écriture stéréo est validée séparément.
+
+### Écriture du Pan statique stéréo — non publiée, validée dans Pro Tools
+
+La branche stéréo de `set_track_pan()` appelle le même resolver live avec
+`allow_stereo=True`, puis `_validated_static_audio_pan_values(tracks)` valide
+tous les pans stéréo en plus des validations communes. Les deux lanes
+existantes doivent être statiques; right=None conserve la droite, sinon
+entier non booléen -100..100 comme à gauche. Tous les payloads modifiés sont
+préparés avant toute affectation; seul leur Int16 +26 change. Retour 1/0 par
+piste, objets inchangés conservés, UI et autres données préservés, save séparé.
+Les cibles mono ne passent pas par la validation Pan des témoins stéréo.
+Ouverture/lecture/sauvegarde/réouverture et cycles/compositions sont validés;
+dix régressions ajoutées, suite 459, Python 3.8 de 44 fichiers vérifié.
+Automation, lanes absentes et autres géométries restent refusées par ce writer statique.
+
+### Lecture d'automation Pan mono — non publiée
+
+`get_pan_automation(track_name, right=False)` utilise le resolver live commun
+`_validated_mono_pan_tracks(allow_automation=True)`. Il garde toutes les
+validations d'identités Audio nommées, slots/état/Volume et conteneurs mono;
+seul le décodeur de payload devient `_decode_verified_mono_pan_payload()`.
+Taille/header/count/flags/segments/padding/terminateur, timestamp initial
+zéro puis ordre strict, et valeurs -100..100 sont validés intégralement
+pour toutes les monos avant sélection. Les témoins stéréo sont opaques;
+pour cette branche mono, canal droit refusé et right exige un booléen False.
+La branche de lecture stéréo distincte est décrite ci-dessous.
+Retour frais liste de tuples (sample absolu, pan), statique = un point,
+absence mono vérifiée = None; nom absent n'est pas une absence de lane.
+Lecture sans cache/UI/mutation/save, pas de liste de points tronquée.
+Les lecteurs et writers statiques conservent leur mode par défaut strict.
+Paire native trois nœuds et quatre cycles exacts, treize régressions :
+suite 472, 45 fichiers compatibles syntaxiquement avec Python 3.8.
+La résolution de cible/lane est partagée avec le writer mono via
+`_validated_pan_automation_target()`, après validation du nom par
+l'appelant. Le resolver commun sélectionne désormais mono/gauche/droite;
+son ancienne branche privée allow_stereo a été retirée après validation d'écriture stéréo.
+
+### Remplacement d'automation Pan mono — non publié, validé dans Pro Tools
+
+`set_pan_automation(track_name, nodes, right=False)` réutilise ce resolver
+live et exige une lane existante. Mono uniquement, right booléen False.
+Entrée non vide de paires (sample UInt32, Pan entier non booléen -100..100),
+timestamps uniques, triés et premier sample zéro. Prévalidation de tous
+les profils existants puis de l'entrée entière; construire les bytes et
+revalider le payload avant une seule affectation. Retour count, no-op
+conservant l'objet payload, save séparé. Aucun UI ni nouvelle lane, autre
+courbe/routing/média intact. Remplacement explicitement demandé : une liste
+d'un seul point est permise; le writer statique garde son refus d'automation.
+Le candidat natif-derived ouvert dans Pro Tools est reproduit exactement;
+la sauvegarde native et ses positions réellement éditées sont préservées
+dans les cycles/compositions, sans compensation de timestamp supposée.
+Treize nouvelles régressions, suite 485, 46 fichiers AST Python 3.8 vérifiés.
+Cette étape mono reste acquise; l'extension stéréo validée est décrite ci-dessous.
+
+### Lecture d'automation Pan stéréo — non publiée
+
+Le même `get_pan_automation()` valide right booléen et demande au resolver
+`_validated_pan_automation_target(track_name, right=False)` la lane gauche
+ou droite. Uniquement pour cible stéréo, les deux conteneurs de toutes les
+stéréo sont validés avant le résultat filtré. Le décodeur de conteneur
+`_decode_verified_static_stereo_pan_container(..., allow_automation=True)`
+partage la géométrie exacte et appelle le décodeur d'enveloppe historique
+`_decode_verified_mono_pan_payload()` : même schéma corroboré sur les deux
+canaux. Son mode statique par défaut reste strict et refuse les courbes.
+Mono conserve son scope et ses témoins stéréo opaques; right=True sur une
+mono est refusé. Lecture live sans UI/cache/mutation; le writer réutilise
+maintenant cette résolution après sa validation native séparée.
+Paire native à positions finales distinctes, quatre cycles exacts, données
+audio et références préservées; dix tests, suite 495, 47 fichiers Python 3.8.
+### Remplacement d'automation Pan stéréo — non publié, validé dans Pro Tools
+
+`set_pan_automation()` sélectionne la lane mono/gauche/droite via le même
+resolver live que le lecteur. Pour une cible stéréo, les deux conteneurs de
+toutes les pistes stéréo sont validés avant l'entrée et l'encodage; pour une
+mono, les témoins stéréo restent opaques. Le payload sélectionné seul est
+remplacé après validation complète, sans créer de lane ni synchroniser l'UI.
+Même contrat UInt32/Pan entier, count retourné/no-op et save séparé que mono.
+Un appel ne cible qu'un canal; deux appels successifs ne constituent pas une
+transaction multi-canal. Ancien paramètre privé allow_stereo et refus global
+stéréo retirés, pas de writer parallèle ni helper mort. Candidat public exact,
+save natif aux positions attendues et cycles/compositions vérifiés; sept tests,
+suite 502, syntaxe Python 3.8 de 48 fichiers vérifiée.
 
 ### Lecture seule de l'automation de Volume
 
@@ -378,3 +670,21 @@ Une révision qui change le format, une fonctionnalité ou une limitation doit m
 - `changelog.md` pour l'historique;
 - `architecture.md` seulement si les composants ou le flux global changent;
 - `handoff.md` pour l'état opérationnel de la prochaine reprise.
+
+L'audit technique de contribution est clôturé le11octobre2026 pour les profils
+documentés/validés, sans intégration des variantes sans oracle. Les contrôles
+de livraison sont séparés des tests Pro Tools : suite standard-library588avec
+corpus local; copie portable463exécutés/125fixtures absentes signalées en skips;
+Python3.8 vérifié par AST, pas assimilé à une exécution locale de cet interpréteur.
+Trois anciennes références à une application cliente dans les tests deviennent
+des fixtures locales optionnelles sans chemin machine. Les sessions restent privées.
+
+`.github/workflows/tests.yml` programme tests Windows/Linux/Python3.8/3.11/3.13,
+build/contrôle et installation isolée aux futurs push/PR. Aucun run distant
+n'est revendiqué avant publication. `MANIFEST.in` exclut médias/configuration/
+caches de la distribution et inclut les docs techniques/tests/checker.
+`scripts/check_distribution.py` vérifie module exact, version, absence de
+dépendancesruntime, notices LGPL et exclusion des donnéesprivées dans wheel/sdist.
+Le contrôle local de construction/installation est effectué hors dépôt et
+hors environnementPython global. La version reste1.5.2 jusqu'au choix explicite
+du mainteneur pour une nouvelle release.

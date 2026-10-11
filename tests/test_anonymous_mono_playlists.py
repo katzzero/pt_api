@@ -184,7 +184,7 @@ class AnonymousMonoPlaylistTests(unittest.TestCase):
 
     def test_main_counters_and_headers_are_not_bypassed_by_resolution(self):
         for variant, error in (('track_count', 'track count'), ('event_count', 'event count'),
-                               ('mixed', 'Mixed named and anonymous'),
+                               ('mixed', 'disagrees with verified Audio identities'),
                                ('header', 'Unsupported anonymous main playlist header')):
             with self.subTest(variant=variant):
                 session = anonymous_session()

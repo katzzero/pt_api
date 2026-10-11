@@ -216,7 +216,7 @@ class GetTracksTests(unittest.TestCase):
     def test_unverified_anonymous_playlists_are_not_silently_omitted(self):
         cases = (
             ([playlist('')], 'Track name cannot be empty'),
-            ([playlist('NAMED'), playlist('')], 'Mixed named and anonymous'),
+            ([playlist('NAMED'), playlist('')], 'Track name cannot be empty'),
             ([playlist('NAMED'), playlist('', event_count=1)], 'event count'),
         )
         for playlists, error in cases:

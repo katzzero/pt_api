@@ -1,0 +1,7 @@
+include LICENSE COPYING NOTICE.md README.md architecture.md changelog.md pt_format_specs.md
+include scripts/check_distribution.py
+recursive-include tests *.py
+global-exclude *.ptx *.wav *.aif *.aiff *.mxf *.pyc .env
+prune tests/fixtures
+prune __pycache__
+prune tests/__pycache__
