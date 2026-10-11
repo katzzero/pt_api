@@ -255,7 +255,9 @@ class LoadingValidationTests(unittest.TestCase):
 
             session = ProToolsSession(source)
             session.save(destination)
-            self.assertEqual(session.file_path, str(destination.resolve()))
+            # Windows can expose the same file through short and long path names.
+            self.assertTrue(os.path.isabs(session.file_path))
+            self.assertTrue(os.path.samefile(session.file_path, destination))
             self.assertTrue(destination.is_file())
 
             for operation in (
@@ -279,7 +281,8 @@ class LoadingValidationTests(unittest.TestCase):
             finally:
                 os.chdir(previous_directory)
 
-            self.assertEqual(session.file_path, str(source.resolve()))
+            self.assertTrue(os.path.isabs(session.file_path))
+            self.assertTrue(os.path.samefile(session.file_path, source))
 
     def test_invalid_header_is_rejected_before_block_parsing(self):
         invalid = minimal_ptx()

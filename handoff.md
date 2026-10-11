@@ -14,7 +14,29 @@ Contrôles du changement de licence : textes LICENSE/COPYING identiques aux sour
 
 ## État de reprise
 
-### Brouillon GitHub v1.6.0 préparé — non publié
+### Publication v1.6.0 et correction de portabilité CI — 11 octobre 2026
+
+La release v1.6.0 est maintenant publiée. Après publication prématurée avant le
+commit, le tag a été corrigé avec autorisation du mainteneur vers le commit
+`f56647963978166fbd1270d1ec5e613170933280` (master). Les sources de l'archive
+GitHub ont été comparées aux fichiers locaux; version module/paquet1.6.0.
+URL : https://github.com/sebedard-creator/pt_api/releases/tag/v1.6.0.
+
+Le run CI38165859409 de ce commit réussit sur Linux3.8/3.11/3.13 et pour le
+build/contrôle/installation du paquet, mais échoue sur Windows aux deux mêmes
+assertions de `tests/test_loading.py`. Le dossier temporaire court
+`RUNNER~1` et son nom long `runneradmin` désignent le même fichier;
+`os.path.abspath()` conserve le premier tandis que `Path.resolve()` retourne
+le second. Le contrat est un chemin absolu vers le bon fichier, pas une
+orthographe canonique particulière. Correction locale : vérifier séparément
+`os.path.isabs()` et `os.path.samefile()` pour le chargement et la sauvegarde.
+Aucun changement du code API, du format PTX, du workflow ou de la version.
+Pas de commit/push ni nouvelle modification du tag par cette correction.
+La CI distante corrigée reste à vérifier après commit/push du mainteneur.
+Contrôles locaux après correction :24 tests de chargement puis638 tests avec
+`-W error` réussis, Pyflakes du fichier modifié et `git diff --check` propres.
+
+### Historique : brouillon GitHub v1.6.0 préparé avant publication
 
 L'utilisateur demande un draft de release directement sur GitHub et garde la
 publication à sa main. Brouillon créé et relu : releaseID409855015, tag_name

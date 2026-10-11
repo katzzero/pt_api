@@ -1,6 +1,16 @@
 # Pro Tools API - Changelog
 
-## v1.6.0 — publication en préparation
+## Non publié — maintenance des tests CI
+
+- **11 octobre 2026 — chemins Windows** : deux assertions de chargement/
+  sauvegarde vérifient désormais que le chemin est absolu et désigne le même
+  fichier, au lieu de comparer son texte à `Path.resolve()`. Les aliases DOS
+  courts des runners GitHub peuvent différer du nom long sans changer le
+  fichier. Correction limitée aux tests; API, fichiers PTX, version et workflow
+  inchangés. Les638 tests locaux passent avec `-W error`; validation distante
+  attendue après commit/push.
+
+## v1.6.0
 
 Le lot audité ci-dessous est préparé pour1.6.0 : routage bus mono/stéréo sur
 pistes mono, Volume/Pan mono et stéréo, Clip Gain statique mixte sécurisé,
