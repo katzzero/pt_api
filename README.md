@@ -1,6 +1,15 @@
 Thank you to **Damien Zammit and Robin Gareus**, creators of [ptformat](https://github.com/zamaudio/ptformat), for their foundational work on the Pro Tools session format and decryption. Their project was an important reference and inspiration when pt_api began.
 
-# v1.6.0 — What's new
+# v1.6.1 — Exact frame rates and timecode fixes
+
+Thank you to **[KatzZero (@katzzero)](https://github.com/katzzero)** for the exact-rate field research and proposed 19-rate table.
+
+- Read the full exact PTX frame-rate enum, correctly distinguishing 24/48 and 23.976/47.952 sessions.
+- Support 19 exact rate enums, with correct high-rate drop-frame calculations and consistent move/split frame limits.
+- Use exact rational rounding to avoid one-sample errors at long positions; preserve public signatures and colon-separated timecodes.
+- **655 local regression tests pass.** The three final API-generated sessions were validated in Pro Tools; their native resaves preserve the expected placements and pass byte-identical API save cycles. Existing creation/import profiles remain unchanged.
+
+## v1.6.0 — Expanded editing and automation
 
 A heartfelt thank you to **[JF Viguie (@oudileoudi)](https://github.com/oudileoudi)** for his generous contributions, fixes and shared format research. His work helped identify edge cases and substantially expand the API. The contributions were reviewed, adapted to the supported native profiles and covered by regression tests and Pro Tools checks.
 
@@ -59,7 +68,7 @@ The table covers the public session, builder, timecode and binary APIs. **Suppor
 | Static Pan | `get_track_pan()`, `get_track_pan_lr()`, `set_track_pan()` | Mono reader or mono/stereo left-right reader/writer; integer −100…100, existing verified static target lanes. Supported neighboring curves retained; target curves never flattened. |
 | Pan automation | `get_pan_automation()`, `set_pan_automation()` | Read/replace an existing mono or selected stereo-channel envelope. UInt32 samples, unique ordered positions starting at zero; no general multichannel or new-lane authoring. |
 | Principal output routing | `get_track_outputs()`, `set_track_output()` | Mono Audio tracks to verified autonomous mono/stereo buses. Strict identity/code/pan checks; unused targets require consistent two-bus calibration. No bus creation, hardware-output or Send editor. |
-| Timecode conversion | `TimecodeEngine`: `get_frame_rate()`, `samples_to_timecode()`, `timecode_to_samples()`, `duration_to_samples()` | 23.976, 24, 25 non-drop and 29.97 drop-frame. Authoring profiles may impose a narrower frame rate. |
+| Timecode conversion | `TimecodeEngine`: `get_frame_rate()`, `samples_to_timecode()`, `timecode_to_samples()`, `duration_to_samples()` | 19 exact enums covering 23.976, 24, 25, 29.97, 30, 47.952, 48, 50, 59.94, 60, 100, 119.88 and 120, with the documented ND/DF variants. Colon-separated output retained; DF skips 2/4/8 labels at nominals 30/60/120. Authoring profiles remain narrower. |
 | Low-level binary tools | `PTBlock` (`to_bytes()`, `get_all_blocks()`), `unxor_session()`, `xor_session()` | Query/serialize block trees and decrypt/encrypt PTX bytes. Advanced operations remain subject to bounds, tree validation and reference integrity. |
 
 Editing methods normally change the loaded session in memory: call `save()` explicitly. The builder publishes its own output directory; relinking also creates a new WAV. Keep session/media together and preserve the originals.

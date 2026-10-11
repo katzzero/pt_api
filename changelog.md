@@ -1,6 +1,15 @@
 # Pro Tools API - Changelog
 
-## Non publié — maintenance des tests CI
+## v1.6.1 — cadences exactes et Drop Frame (publication en préparation)
+
+- **11 octobre 2026** : adaptation locale de la contribution de KatzZero (@katzzero, PR #2), sans merge automatique de la branche obsolète. Lecture du UInt32 complet à +40 de `0x204d`; rejet des payloads tronqués, conservation des champs opaques et des enums inconnus sans fallback vers la famille.
+- Table de 19 cadences exactes; Drop Frame corrigé à 2/4/8 numéros omis pour les nominals 30/60/120. Les variantes entières et fractionnaires restent distinctes. Validation temporelle de move/split cohérente avec le moteur, y compris la dernière image nominale.
+- Conversions avec rapports exacts et arrondi demi-supérieur, corrigeant aussi un écart d'un sample sur une longue position. Contrat texte à deux-points et distinction position/durée conservés; aucun élargissement des profils d'authoring/import.
+- 17 tests ajoutés : oracles rationnels indépendants des 19 cadences, énumération des labels DF, bornes/refus atomiques, UInt32 inconnu, géométries variables, deux cycles byte-identiques sur 18 références natives et sur trois sorties resauvegardées dans Pro Tools. **655 tests réussis** avec le corpus local. Les références natives ne sont pas distribuées; leur absence entraîne des skips explicites en CI.
+- Le mainteneur confirme les trois sorties finales (48ND,119.88DF,120DF). Leurs sauvegardes natives conservent les plages exactes, les marqueurs et le WAV; chacune passe deux cycles API byte-identiques. Validation de cette passe terminée, sans prétendre à une vérification manuelle exhaustive des19 conversions.
+- Versions source et paquet harmonisées à1.6.1; brouillon de release préparé. Aucun commit/push/tag/publication effectué par l'agent.
+
+## Maintenance des tests CI — commit d52165a
 
 - **11 octobre 2026 — chemins Windows** : deux assertions de chargement/
   sauvegarde vérifient désormais que le chemin est absolu et désigne le même

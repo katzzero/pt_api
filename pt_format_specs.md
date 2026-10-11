@@ -1,6 +1,6 @@
 # Spécifications binaires du format Pro Tools (`.ptx`)
 
-*(Spécification du code courant de `pt_api`, version déclarée 1.6.0, publication en préparation. Les mentions « non publié » désignent les apports du développement audité avant publication; les checkpoints et preuves historiques gardent leur version d'origine. Les profils exclus/reportés ne deviennent pas pris en charge par ce changement de version.)*
+*(Spécification du code courant de `pt_api`, version déclarée 1.6.1, publication en préparation. Le correctif de cadences exactes (§1.4) a passé la validation finale dans Pro Tools et les contrôles des sauvegardes natives. Les checkpoints et statuts historiques de l'annexe gardent leur contexte d'origine; ils ne remplacent pas les règles courantes. Les profils exclus/reportés ne deviennent pas pris en charge par un changement de version.)*
 
 Ce document décrit exactement les structures que le code courant lit, valide, modifie et sérialise. Une structure dite « observée » provient des sessions de référence; une structure dite « prise en charge » possède un chemin explicite dans `pt_api.py`. Les zones non interprétées sont conservées telles quelles et ne doivent pas être déduites par heuristique.
 
@@ -86,16 +86,53 @@ Cette liste est une règle de sécurité : promouvoir un timestamp, un gain ou u
 
 ### 1.4 Métadonnées temporelles et `TimecodeEngine`
 
-- `0x1028` : exactement une racine est requise. Son premier segment brut doit mesurer au moins 6 octets; la fréquence d'échantillonnage est le UInt32 à `+2` et doit être positive.
-- `0x204d` : exactement une racine est requise. Son premier octet est l'enum de cadence.
-- `get_frame_rate()` expose les mappings convertibles : `0x01 = 24 fps`, `0x09 = 24000/1001 non-drop`, `0x05 = 30000/1001 Drop Frame` avec cadence nominale de 30 images et, dans le changement local non publié, `0x02 = 25 fps non-drop` avec cadence nominale de 25 images.
-- Une cadence inconnue peut être chargée et préservée sans conversion, mais toute méthode demandant un calcul temporel la rejette.
-- `samples_to_timecode()` accepte un entier non négatif, arrondit à l'image la plus proche avec `floor(x + 0.5)` et retourne toujours `HH:MM:SS:FF`, y compris en Drop Frame.
-- `timecode_to_samples()` valide les composants et interdit en 29.97 DF les labels `00` et `01` au début de chaque minute non divisible par dix.
-- `duration_to_samples()` applique la cadence réelle mais n'applique pas l'interdiction des labels Drop Frame, puisqu'il convertit une durée et non une position.
-- Les opérations de timeline prennent des images entières; l'API ne possède pas de paramètre de subframe. Les trims exprimés en échantillons restent, eux, sample-accurate.
+**État : intégré au code courant1.6.1, validation finale de cette passe terminée; publication en préparation.** Cette section décrit le code courant, pas seulement la release antérieure1.6.0.
 
-**Mapping 25 fps, changement non publié** : `0x204d[0] == 0x02` correspond au profil non-drop de cadence nominale 25. À 48 kHz, une image représente 1920 échantillons; aux autres fréquences, les conversions utilisent `sample_rate / 25`. Ce mapping ne modifie ni les champs de placement décrits en §4.2 ni les contraintes 48 kHz / 23.976 du builder et des groupes vides. Validation : annexe A (§1.4).
+- `0x1028` : exactement une racine est requise. Son premier segment brut doit mesurer au moins 6 octets; la fréquence d'échantillonnage est le UInt32 à `+2` et doit être positive.
+- `0x204d` : exactement une racine est requise; son premier segment brut doit mesurer **au moins 44 octets**. La cadence exacte est le **UInt32 little-endian à `+40`**, exposé dans `session.frame_rate_enum`. Le premier octet à `+0` représente une famille ambiguë et n'est ni la source de cadence ni un fallback.
+- Le payload reste plat et intégralement conservé. Les longueurs natives 67/68 octets ne sont pas une contrainte générale. Le champ observé à `+48`, les octets inconnus et la chaîne finale ne sont pas interprétés ou réécrits. Aucune méthode de changement de cadence PTX n'est ajoutée.
+- Une valeur UInt32 inconnue peut être chargée et sauvegardée sans conversion. Elle n'est ni tronquée à un octet ni remplacée par sa famille; toute méthode demandant un calcul temporel la rejette.
+
+| Enum exact | Cadence réelle (images/s) | Nominal `N` | Drop Frame / numéros omis `D` |
+|---|---:|---:|---:|
+| `0x01` | 24 | 24 | non / 0 |
+| `0x02` | 25 | 25 | non / 0 |
+| `0x03` | 30000/1001 | 30 | non / 0 |
+| `0x05` | 30000/1001 | 30 | oui / 2 |
+| `0x07` | 30 | 30 | non / 0 |
+| `0x08` | 30 | 30 | oui / 2 |
+| `0x09` | 24000/1001 | 24 | non / 0 |
+| `0x0A` | 50 | 50 | non / 0 |
+| `0x0B` | 60000/1001 | 60 | non / 0 |
+| `0x0C` | 60000/1001 | 60 | oui / 4 |
+| `0x0D` | 60 | 60 | non / 0 |
+| `0x0E` | 60 | 60 | oui / 4 |
+| `0x0F` | 48000/1001 | 48 | non / 0 |
+| `0x10` | 48 | 48 | non / 0 |
+| `0x11` | 100 | 100 | non / 0 |
+| `0x12` | 120000/1001 | 120 | non / 0 |
+| `0x13` | 120000/1001 | 120 | oui / 8 |
+| `0x14` | 120 | 120 | non / 0 |
+| `0x15` | 120 | 120 | oui / 8 |
+
+`get_frame_rate()` conserve le contrat `(fps_float, is_drop_frame)`. Les rapports entiers exacts sont conservés séparément dans la table interne pour les conversions. `N = ceil(fps)`; pour les variantes DF, `D = 2*(N//30)`. Les variantes DF entières ne sont pas assimilées aux variantes à dénominateur 1001.
+
+**Conversion position → échantillons** : les composants sont des entiers non booléens; heures non négatives, minutes/secondes dans 0..59, `0 <= FF < N`. En DF, à seconde zéro d'une minute non divisible par dix, `FF < D` est inexistant et refusé. Pour `M = 60*HH + MM`, le nombre d'images physiques est :
+
+```text
+F = (60*M + SS)*N + FF - D*(M - M//10)
+samples = arrondi_demi_supérieur(F * sample_rate / fps_réel)
+```
+
+En non-drop, `D = 0`. Pour une **durée**, `duration_to_samples()` utilise `(3600*HH + 60*MM + SS)*N + FF`, sans retrancher de labels ni interdire les numéros omis. Position DF et durée ne sont pas interchangeables.
+
+**Conversion échantillons → position** : le nombre entier d'échantillons doit être non négatif. Arrondir `samples * fps_réel / sample_rate` à l'image physique la plus proche. En DF, pour ce nombre `F`, définir `Q = 600*N - 9*D`, `P = 60*N-D`, `q,r = divmod(F,Q)`; ajouter `9*D*q` à `F`, puis `D*((r-D)//P)` si `r >= D`. Décomposer le nombre de labels obtenu en HH/MM/SS/FF au nominal `N`. Aucun bouclage implicite à 24 heures.
+
+Les conversions utilisent des produits/quotients entiers et un arrondi demi-supérieur exact `(2*numérateur + dénominateur)//(2*dénominateur)`, évitant les erreurs d'une unité dues aux flottants aux longues positions. Un sample rate flottant accepté par le constructeur est traité selon son rapport binaire exact. Les résultats non représentables dans la plage numérique contrôlée sont refusés. Le texte public reste **`HH:MM:SS:FF` même en DF**, avec au moins deux chiffres par composant (FF peut en avoir trois); aucun point-virgule n'est ajouté implicitement.
+
+`move_clip()` et `split_clip()` utilisent le même nominal et le même compte de labels DF que le moteur partagé; leurs garde-fous structurels restent inchangés. Les opérations exprimées en TC n'offrent pas de paramètre subframe; les méthodes exprimées en échantillons restent sample-accurate.
+
+Cette extension de lecture/conversion **n'élargit pas** les profils de création/import stricts 48 kHz / 23.976 du builder, des groupes vides et de l'import natif. Une session 47.952 lue depuis son enum exact `0x0F` ne peut plus se faire passer pour `0x09` grâce à son premier octet. Preuves et limites de validation : annexe A (§1.4).
 
 ## 2. Pointeurs, relocalisation et sauvegarde
 
@@ -1805,6 +1842,10 @@ Les compteurs de tests ci-dessous sont ceux des étapes successives; ils ne s'ad
 
 **Étape 2 non publiée — 25 fps** : une session native Pro Tools 2024.3.1 confirme `0x204d[0] == 0x02`, à 48 kHz. L'image vaut exactement 1920 échantillons. Le clip natif de 96000 échantillons débute à `1728046080` (`10:00:00:24`) et finit à `1728142080` (`10:00:02:24`); les markers natifs sont à `1728046080`, `1728048000` (`10:00:01:00`) et `1730880000` (`10:01:00:00`). `move_clip()` vers `10:00:01:00` écrit seulement le UInt64 de placement `0x104f+7`, soit +1920 échantillons, sans toucher aux définitions, médias ou markers; la nouvelle fin est `1728144000` (`10:00:03:00`). Les tests confirment les conversions position/durée, l'arrondi à la demi-image, les transitions seconde/minute, le rejet de `FF >= 25`, les calculs à 44.1/48/96 kHz, le cycle natif byte-identique et les limites d'authoring conservées. L'utilisateur confirme l'ouverture/sauvegarde/réouverture de la sortie déplacée dans Pro Tools 2024.3.1; le fichier resauvegardé conserve le clip et les markers attendus et passe deux nouveaux cycles API byte-identiques, couverts par un second test natif optionnel. Cette extension du moteur temporel n'élargit pas les profils de création stricts 48 kHz / 23.976 du builder et des groupes vides.
 
+**Correctif local des cadences exactes, 11 octobre 2026 — validation finale terminée** : les paires natives 24/48 et 23.976/47.952 possèdent respectivement les mêmes octets de famille 0x01/0x09, mais des UInt32 à +40 distincts (0x01/0x10 et 0x09/0x0F). Les références 59.94DF/119.88DF ont une famille 0x05, des enums exacts 0x0C/0x13 et des payloads 67/68 octets. Les valeurs de +48 changent aussi; aucune sémantique d'écriture de ce champ n'est déduite. À 48k, les marqueurs natifs de première minute légale, dix minutes et une heure valent 2882880, 28799971 et 172799827 samples aux deux cadences DF fractionnaires : premiers labels 04 au nominal60 et 08 au nominal120. Ils corroborent les comptes de quatre/huit numéros omis, indépendamment des aller-retours API.
+
+Les onze autres cadences sélectionnées nativement corroborent les enums 0x03, 0x07, 0x08, 0x0A, 0x0B, 0x0D, 0x0E, 0x11, 0x12, 0x14 et 0x15; les variantes à nominal120 possèdent un payload de68 octets. Les positions en samples des marqueurs sont volontairement conservées dans ce lot : ce n'est pas un oracle indépendant de leur affichage TC à chaque nouvelle cadence. Avec le 25fps historique, dix-huit enums distincts disposent de fixtures locales; le 0x05 reste le mapping historique. Deux cycles sans mutation par référence sont byte-identiques. Les calculs des19 mappings sont testés avec une table rationnelle indépendante, une énumération des labels DF, bornes/refus atomiques et profils d'authoring inchangés. La suite atteint655 tests avec le corpus privé. Le mainteneur valide les trois sorties de déplacements isolés (48ND,119.88DF,120DF) dans Pro Tools. Leurs sauvegardes natives conservent respectivement527000→623000,2882880→2978880 et172627200→172723200 samples (longueur96000), les marqueurs et le WAV. Chaque sauvegarde native passe deux cycles API byte-identiques; ces résultats ne sont pas présentés comme une publication ou une validation manuelle exhaustive des19 cadences.
+
 ### A.3 — validation de §4.1
 
 **Basic Folder, observation native en lecture seule** : dans la paire 48 kHz / enum `0x09` vérifiée, le dossier `FOLDER_TEST` possède deux miroirs `0x251a` sous `0x2519`. Leur premier octet vaut `0x0b` (les miroirs Audio valent `0x00`), la longueur du nom est le UInt32 à `+2`, et le nom commence à `+6`. Le dossier ne possède aucun `0x1052` principal : le compteur `0x1054` reste 2 et ses playlists `A_OUTSIDE` / `B_INSIDE` restent nommées, même après placement de B dans le dossier. Le lecteur retourne ces deux noms, pas le nom du Basic Folder. Les deux clips `MEDIA`, de longueur 1355354 et offset source 0, restent à 1729728000 et 1730208480 échantillons; la définition audio et le WAV sont inchangés. Deux cycles API sans mutation par session sont byte-identiques et conservent tous les champs de dossier opaques. Aucune création, modification ou reconstruction de dossier n'est implémentée; l'ouverture, la lecture, la sauvegarde et la réouverture manuelle de la copie API dans Pro Tools sont confirmées. Le fichier resauvegardé conserve les deux playlists, les deux miroirs de dossier et les clips, puis passe deux nouveaux cycles API byte-identiques. Cette observation ne valide ni les Routing Folders, ni l'imbrication, ni les playlists anonymes AAF. Le lecteur courant n'ajoute pas le fallback de catalogue `0x251a` de la contribution.
@@ -2484,9 +2525,9 @@ Les quatre apports sont clôturés seulement dans le périmètre documenté.
 
 ## 13. Catalogue exhaustif des erreurs
 
-La portée d'« exhaustif » est la suivante : toutes les familles d'échecs explicitement détectées ou propagées par `pt_api.py` 1.5.2, ainsi que tous les messages Pro Tools consignés dans le corpus et l'historique des essais du projet. Elle ne prétend pas recenser les messages possibles de toutes les versions de Pro Tools.
+La portée d'« exhaustif » est la suivante : toutes les familles d'échecs explicitement détectées ou propagées par le code courant de `pt_api.py`, ainsi que tous les messages Pro Tools consignés dans le corpus et l'historique des essais du projet. Elle ne prétend pas recenser les messages possibles de toutes les versions de Pro Tools.
 
-Le source courant contient 1001 instructions `raise` : 844 `ValueError`, 92 `TypeError`, 20 `NotImplementedError`, 20 `OverflowError`, 8 `FileNotFoundError`, 3 `FileExistsError`, 1 `OSError` et 13 relances nues de l'exception originale.
+Le source courant contient 1002 instructions `raise` : 844 `ValueError`, 92 `TypeError`, 20 `NotImplementedError`, 21 `OverflowError`, 8 `FileNotFoundError`, 3 `FileExistsError`, 1 `OSError` et 13 relances nues de l'exception originale. L'`OverflowError` interne supplémentaire du calcul rationnel est converti en `ValueError` de plage par les méthodes publiques temporelles.
 
 ### 13.1 Messages observés dans Pro Tools
 

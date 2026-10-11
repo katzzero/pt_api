@@ -1,4 +1,4 @@
-# Architecture logicielle de `pt_api` 1.6.0
+# Architecture logicielle de `pt_api` 1.6.1
 
 Ce document donne un survol global du logiciel. Les structures binaires, offsets, flags et messages d'erreur appartiennent à [`pt_format_specs.md`](pt_format_specs.md), qui est la spécification technique normative. La surface publique et ses limitations sont résumées dans [`README.md`](README.md).
 
@@ -105,7 +105,7 @@ Le correctif local non publié protège aussi les préfixes bruts explicitement 
 
 `TimecodeEngine` centralise les conversions entre échantillons, positions et durées. Il utilise la fréquence et la cadence réellement lues dans la session; aucune valeur temporelle par défaut n'est injectée silencieusement.
 
-L'étape 2 non publiée ajoute le mapping natif 25 fps non-drop dans ce moteur partagé, sans autre changement de flux. Les lecteurs et mutations déjà fondés sur ce moteur en bénéficient; les writers de création à profil 48 kHz / 23.976 conservent leurs validations indépendantes. Les tests temporels, la lecture native et le déplacement écrit d'une image sont validés, y compris l'ouverture/sauvegarde/réouverture dans Pro Tools puis les cycles API sur le fichier resauvegardé.
+Le moteur sélectionne la cadence exacte par UInt32 à +40 du payload temporel, pas par son octet de famille. La table partagée expose 19 enums; les conversions utilisent des rapports exacts, un nominal cohérent et 2/4/8 labels omis en DF aux nominals 30/60/120. Position absolue et durée restent distinctes, et le format textuel public conserve ses deux-points. Move/split réutilisent les mêmes bornes temporelles. Les lecteurs et mutations déjà fondés sur ce moteur en bénéficient sans réécriture des métadonnées de cadence; les writers de création/import à profil 48 kHz / 23.976 conservent leurs validations indépendantes. Les régressions synthétiques, les cycles natifs sans mutation et les trois déplacements finaux (48ND,119.88DF,120DF) sont validés; les sauvegardes Pro Tools des sorties conservent les positions et passent deux cycles API byte-identiques. L'ancien test natif 25 fps est également validé manuellement. Cela ne signifie pas que toutes les variantes de session aux19 cadences ont été testées manuellement.
 
 ### `ProToolsSession`
 

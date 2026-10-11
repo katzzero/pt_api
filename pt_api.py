@@ -28,7 +28,7 @@ from collections.abc import Mapping
 
 logger = logging.getLogger(__name__)
 
-__version__ = "1.6.0"
+__version__ = "1.6.1"
 
 
 _TEMPLATE_AUDIO_IEEE_FLOAT_SUBFORMAT = bytes.fromhex(
@@ -741,6 +741,30 @@ def xor_session(data: bytearray, out_path: str):
                 pass
 
 class TimecodeEngine:
+    # Exact enum at UInt32 payload +40 of root 0x204d, not its family at +0.
+    # Table contributed by KatzZero; native mappings audited locally.
+    _EXACT_RATES = {
+        0x01: (24, 1, False),
+        0x02: (25, 1, False),
+        0x03: (30000, 1001, False),
+        0x05: (30000, 1001, True),
+        0x07: (30, 1, False),
+        0x08: (30, 1, True),
+        0x09: (24000, 1001, False),
+        0x0A: (50, 1, False),
+        0x0B: (60000, 1001, False),
+        0x0C: (60000, 1001, True),
+        0x0D: (60, 1, False),
+        0x0E: (60, 1, True),
+        0x0F: (48000, 1001, False),
+        0x10: (48, 1, False),
+        0x11: (100, 1, False),
+        0x12: (120000, 1001, False),
+        0x13: (120000, 1001, True),
+        0x14: (120, 1, False),
+        0x15: (120, 1, True),
+    }
+
     def __init__(self, sample_rate, frame_rate_enum):
         if (
             isinstance(sample_rate, bool)
@@ -761,30 +785,18 @@ class TimecodeEngine:
         self.frame_rate_enum = frame_rate_enum
 
     def get_frame_rate(self):
-        # Enum mapping based on block 0x204d payload offset 0
-        # 0x01 = 24 fps
-        # 0x02 = 25 fps (verified native Pro Tools 2024.3.1 session)
-        # 0x09 = 23.976 fps
-        # 0x05 = 29.97 DF fps
-        if self.frame_rate_enum == 0x01:
-            return 24.0, False # fps, is_drop_frame
-        elif self.frame_rate_enum == 0x02:
-            return 25.0, False
-        elif self.frame_rate_enum == 0x09:
-            return 24000 / 1001, False
-        elif self.frame_rate_enum == 0x05:
-            return 30000 / 1001, True
-        else:
+        rate = self._EXACT_RATES.get(self.frame_rate_enum)
+        if rate is None:
             raise ValueError(f"Unsupported frame rate enum: {hex(self.frame_rate_enum)}. The API cannot accurately calculate timecodes for this frame rate yet.")
+        return rate[0] / rate[1], rate[2]
 
     def _nominal_fps(self):
-        if self.frame_rate_enum in (0x01, 0x09):
-            return 24
-        if self.frame_rate_enum == 0x02:
-            return 25
-        if self.frame_rate_enum == 0x05:
-            return 30
-        self.get_frame_rate()  # Raises the public unsupported-rate error.
+        actual_fps, _ = self.get_frame_rate()
+        return math.ceil(actual_fps)
+
+    def _drop_frame_count(self):
+        _, is_drop_frame = self.get_frame_rate()
+        return 2 * (self._nominal_fps() // 30) if is_drop_frame else 0
 
     def _validate_components(self, hh, mm, ss, ff, *, position):
         components = (hh, mm, ss, ff)
@@ -806,45 +818,64 @@ class TimecodeEngine:
             and is_drop_frame
             and mm % 10 != 0
             and ss == 0
-            and ff < 2
+            and ff < self._drop_frame_count()
         ):
             raise ValueError("Timecode falls on a dropped frame number.")
         return nominal_fps
 
     @staticmethod
-    def _round_nonnegative(value):
-        return int(math.floor(value + 0.5))
+    def _round_ratio(numerator, denominator):
+        # Exact half-up rounding; floats can lose one sample at long positions.
+        result = (2 * numerator + denominator) // (2 * denominator)
+        if not math.isfinite(result):
+            raise OverflowError("Timecode conversion result is not finite.")
+        return result
+
+    def _conversion_ratio(self):
+        """Return an exact frames-per-sample ratio, including float sample rates."""
+        self.get_frame_rate()  # Validate the full enum before selecting a ratio.
+        rate_numerator, rate_denominator, _ = self._EXACT_RATES[self.frame_rate_enum]
+        if isinstance(self.sample_rate, int):
+            sample_numerator, sample_denominator = self.sample_rate, 1
+        else:
+            sample_numerator, sample_denominator = self.sample_rate.as_integer_ratio()
+        return rate_numerator * sample_denominator, rate_denominator * sample_numerator
 
     def samples_to_timecode(self, samples):
         if isinstance(samples, bool) or not isinstance(samples, int):
             raise TypeError("Sample position must be an integer.")
         if samples < 0:
             raise ValueError("Sample position cannot be negative.")
-        actual_fps, is_df = self.get_frame_rate()
+        _, is_df = self.get_frame_rate()
         nominal_fps = self._nominal_fps()
             
         try:
-            total_seconds = samples / self.sample_rate
+            rate_numerator, rate_denominator = self._conversion_ratio()
+            actual_frames = self._round_ratio(samples * rate_numerator, rate_denominator)
 
             if not is_df:
-                total_frames = self._round_nonnegative(total_seconds * actual_fps)
+                total_frames = actual_frames
                 ff = total_frames % nominal_fps
                 ss = (total_frames // nominal_fps) % 60
                 mm = (total_frames // (nominal_fps * 60)) % 60
                 hh = total_frames // (nominal_fps * 3600)
             else:
-                # Drop frame logic (29.97)
-                frames = self._round_nonnegative(total_seconds * actual_fps)
-                d = frames // 17982
-                m = frames % 17982
-                frames += 18 * d
-                if m >= 2:
-                    frames += 2 * ((m - 2) // 1798)
+                # Two/four/eight labels are omitted at nominals 30/60/120.
+                drop_frames = self._drop_frame_count()
+                frames_per_ten_minutes = 600 * nominal_fps - 9 * drop_frames
+                frames_per_drop_minute = 60 * nominal_fps - drop_frames
+                frames = actual_frames
+                decades, remainder = divmod(frames, frames_per_ten_minutes)
+                frames += 9 * drop_frames * decades
+                if remainder >= drop_frames:
+                    frames += drop_frames * (
+                        (remainder - drop_frames) // frames_per_drop_minute
+                    )
 
-                ff = frames % 30
-                ss = (frames // 30) % 60
-                mm = (frames // 1800) % 60
-                hh = frames // 108000
+                ff = frames % nominal_fps
+                ss = (frames // nominal_fps) % 60
+                mm = (frames // (60 * nominal_fps)) % 60
+                hh = frames // (3600 * nominal_fps)
         except OverflowError as exc:
             raise ValueError("Sample position exceeds the timecode conversion range.") from exc
             
@@ -852,41 +883,32 @@ class TimecodeEngine:
 
     def timecode_to_samples(self, hh, mm, ss, ff):
         nominal_fps = self._validate_components(hh, mm, ss, ff, position=True)
-        actual_fps, is_df = self.get_frame_rate()
+        _, is_df = self.get_frame_rate()
 
         try:
             if not is_df:
                 total_frames = (hh * 3600 + mm * 60 + ss) * nominal_fps + ff
-                total_seconds = total_frames / actual_fps
-                return self._round_nonnegative(total_seconds * self.sample_rate)
+                rate_numerator, rate_denominator = self._conversion_ratio()
+                return self._round_ratio(total_frames * rate_denominator, rate_numerator)
             else:
-                # Drop frame logic
-                # For 29.97 DF, frame rate is exactly 30000/1001
-                # 2 frames are dropped every minute, except every 10th minute
                 total_minutes = hh * 60 + mm
-
-                # The nominal frame count if it were exactly 30 fps
-                nominal_frames = (total_minutes * 60 + ss) * 30 + ff
-
-                # Subtract dropped frames
-                dropped = 2 * total_minutes - 2 * (total_minutes // 10)
-
+                nominal_frames = (total_minutes * 60 + ss) * nominal_fps + ff
+                dropped = self._drop_frame_count() * (
+                    total_minutes - total_minutes // 10
+                )
                 actual_frames = nominal_frames - dropped
-
-                total_seconds = actual_frames / (30000 / 1001)
-                return self._round_nonnegative(total_seconds * self.sample_rate)
+                rate_numerator, rate_denominator = self._conversion_ratio()
+                return self._round_ratio(actual_frames * rate_denominator, rate_numerator)
         except OverflowError as exc:
             raise ValueError("Timecode position exceeds the sample conversion range.") from exc
 
     def duration_to_samples(self, hh, mm, ss, ff):
         """Convert a duration without applying drop-frame label exclusions."""
         nominal_fps = self._validate_components(hh, mm, ss, ff, position=False)
-        actual_fps, _ = self.get_frame_rate()
         try:
             total_frames = (hh * 3600 + mm * 60 + ss) * nominal_fps + ff
-            return self._round_nonnegative(
-                (total_frames / actual_fps) * self.sample_rate
-            )
+            rate_numerator, rate_denominator = self._conversion_ratio()
+            return self._round_ratio(total_frames * rate_denominator, rate_numerator)
         except OverflowError as exc:
             raise ValueError("Timecode duration exceeds the sample conversion range.") from exc
 
@@ -4380,12 +4402,12 @@ class ProToolsSession:
         if (
             not frame_block.items
             or not isinstance(frame_block.items[0], (bytes, bytearray))
-            or len(frame_block.items[0]) < 1
+            or len(frame_block.items[0]) < 44
         ):
             raise ValueError("Invalid root 0x204d frame-rate payload.")
 
         self.sample_rate = sample_rate
-        self.frame_rate_enum = frame_block.items[0][0]
+        self.frame_rate_enum = struct.unpack_from(fmt, frame_block.items[0], 40)[0]
 
     def _resolve_unique_clip_id(self, clip_name):
         if not isinstance(clip_name, str) or not clip_name:
@@ -4822,12 +4844,10 @@ class ProToolsSession:
 
         engine = TimecodeEngine(self.sample_rate, self.frame_rate_enum)
         _, is_drop_frame = engine.get_frame_rate()
-        nominal_fps = 30 if self.frame_rate_enum == 0x05 else (
-            24 if self.frame_rate_enum == 0x09 else int(engine.get_frame_rate()[0])
-        )
+        nominal_fps = engine._nominal_fps()
         if ff >= nominal_fps:
             raise ValueError(f"Frame component must be below {nominal_fps}.")
-        if is_drop_frame and mm % 10 != 0 and ss == 0 and ff < 2:
+        if is_drop_frame and mm % 10 != 0 and ss == 0 and ff < engine._drop_frame_count():
             raise ValueError("Target timecode falls on a dropped frame number.")
 
         target_samples = engine.timecode_to_samples(hh, mm, ss, ff)
@@ -7562,12 +7582,10 @@ class ProToolsSession:
 
         engine = TimecodeEngine(self.sample_rate, self.frame_rate_enum)
         _, is_drop_frame = engine.get_frame_rate()
-        nominal_fps = 30 if self.frame_rate_enum == 0x05 else (
-            24 if self.frame_rate_enum == 0x09 else int(engine.get_frame_rate()[0])
-        )
+        nominal_fps = engine._nominal_fps()
         if cut_ff >= nominal_fps:
             raise ValueError(f"Frame component must be below {nominal_fps}.")
-        if is_drop_frame and cut_mm % 10 != 0 and cut_ss == 0 and cut_ff < 2:
+        if is_drop_frame and cut_mm % 10 != 0 and cut_ss == 0 and cut_ff < engine._drop_frame_count():
             raise ValueError("Cut timecode falls on a dropped frame number.")
 
         original_root_items = copy.deepcopy(self.root_items)

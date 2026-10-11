@@ -39,6 +39,7 @@ dist/
 /premiere_skip_validation/
 
 # Local native builder-template fixtures (kept outside the published repository)
+/tests/fixtures/timecode_exact_rates/
 /tests/fixtures/walla_template_native_float_31_151.ptx
 /tests/fixtures/walla_template_native_float_31_151_u32.ptx
 /tests/fixtures/native_90_tracks.ptx

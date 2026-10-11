@@ -14,6 +14,111 @@ Contrôles du changement de licence : textes LICENSE/COPYING identiques aux sour
 
 ## État de reprise
 
+### Issue #1 / PR #2 — validation terminée,1.6.1 prête pour commit
+
+Le mainteneur confirme les trois sorties finales dans Pro Tools. Les fichiers resauvegardés sont ceux à la racine de chacun des trois dossiers de `06_final_validation`; les copies `after_pro_tools` restent les sorties API originales. Cette inversion de chemins est identifiée par comparaison aux SHA-256 enregistrés; aucun fichier source/retour n'est modifié pendant les contrôles. Retours natifs :
+
+- 48ND :527000→623000 samples; SHA-256 `6387870709d7dd18b61eb642a572f788a253effc0a98c8f359f9383fc0c7cde0`.
+- 119.88DF :2882880→2978880 samples; SHA-256 `11ebcbcddb5bd233b26f3b98e2e706cb812957060b42f414d3e17a65717b4186`.
+- 120DF :172627200→172723200 samples; SHA-256 `a67074dc97416403cc877f66cf605e6f5ecfa39dc00b29a1efff5e68be6849b6`.
+
+Longueur96000 et piste conservées, marqueurs inchangés, WAV toujours SHA `027c03a783ad5cc826aebb6157b91dec9374381bd539fa0cd95e940f49badb30`. Chaque retour natif passe deux cycles API byte-identiques et conserve ses plages exactes. Trois fixtures `resaved_10/13/15.ptx` ajoutées dans le dossier privé ignoré `tests/fixtures/timecode_exact_rates/`, avec une nouvelle régression optionnelle.
+
+Adaptation au code courant de la contribution KatzZero effectuée, sans merge de la branche obsolète : UInt32 complet à +40 de0x204d, payload au moins44, aucun fallback; table de19 rapports exacts, comptes DF2/4/8; move/split partagent nominal et exclusions. Aucun changement de signature, format public à deux-points conservé, durée distincte de position, aucune écriture des champs +0/+40/+48. Les conversions rationnelles corrigent aussi un arrondi flottant d'un sample à44.1k/120DF/23:59:59:119 (résultat3806429393). Profils de création/import48k/23.976 inchangés.
+
+Les onze cadences du lot natif correspondent à leurs cibles; leurs pistes/clip/timestamps bruts/WAV sont conservés. Dix-huit enums distincts disposent d'une fixture native locale (25fps historique inclus);0x05 demeure historique sans nouvel oracle dédié dans ce lot. Les sauvegardes à cadence changée corroborent les mappings, pas une saisie indépendante de TC pour chaque conversion. Les oracles natifs59.94/119.88DF et les sorties finales constituent des preuves séparées. Ne pas annoncer toutes les variantes aux19 cadences comme testées manuellement.
+
+17 régressions ajoutées au total; **655 tests locaux passent avec -W error**. Une copie sans fixtures passe514 tests avec141 skips explicites. Syntaxe Python3.8 des61 fichiers valide, pyflakes et diff --check propres. Wheel et sdist1.6.1 construits en environnement isolé dans un répertoire temporaire hors dépôt; `check_distribution.py` confirme source/version/licence/notices identiques et absence de médias/configuration privée. Warnings de dépréciation setuptools sur les anciennes métadonnées de licence, sans échec; forme actuelle conservée pour la compatibilité Python3.8/setuptools>=61, maintenance future à prévoir. Fixtures privées ignorées et exclues de la distribution. Versions source/paquet harmonisées à **1.6.1**; README,architecture,changelog et spécification mis à jour. La release1.6.0 publiée reste intacte. HEAD reste d52165a; aucun commit/push/tag/publication/fermeture d'issue ou PR par l'agent.
+
+Brouillon GitHub ID409895509, tag prévu `v1.6.1`, cible `master`, `draft=true`, URL courante https://github.com/sebedard-creator/pt_api/releases/tag/untagged-98fbb2f4ac95a1f0ce08 . Notes mises à jour pour refléter la validation native terminée; publication bloquée seulement par les étapes de livraison normales : commit/push du bon code, CI et tag sur le commit corrigé. Ne pas publier sur le master actueld52165a sans avoir poussé le correctif. Le mainteneur peut utiliser `Fixes #1` dans le commit; fermer ensuite PR#2 sans merge en citant le commit et l'adaptation. Aucun commentaire/fermeture distant n'est envoyé sans autorisation.
+
+Les sections ci-dessous sont le journal historique antérieur à l'intégration, pas l'état courant.
+
+### Journal historique de l'audit timecode, avant intégration
+
+Au11octobre2026, contribution katzzero examinée au commit
+`902620d6542c563ecc4f170f35b2e24b8dabb949`, code locald52165a.
+PR https://github.com/sebedard-creator/pt_api/pull/2 en conflit, aucun merge.
+Défauts reproduits : DF élevé garde deux labels au lieu d'un compte
+proportionnel au nominal (59.94DF :+86487samples à1h/48k); lecteur proposé
+tronque à un octet le UInt32 annoncé à payload+40 (0x109 devient0x09);
+move/split conservent `int(fps)` et les gardesDF historiques hors moteur.
+Les14tests timecode existants passent avec la classe candidate en mémoire,
+mais ne couvrent pas ces nouveautés.99fixtures natives lues :payload67,
+16cadences25 et83cadences23.976, toujours premier octet==UInt32+40;
+À ce checkpoint initial, aucune preuve des ambiguïtés24/48 et23.976/47.952.
+Rapport et consignes : `Y:\SHARE TO NETWORK\pt_api_debug_timecode`.
+Première demande seulement :paire24/48 dans `01_24_vs_48`, même session/audio,
+seule cadence de session changée. Aucun code API/spec normative modifié;
+table19enums et DF entier restent à corroborer. Ne pas fusionner tel quel ni
+présenter les14tests ciblés comme la validation du patch complet.
+
+**Premier retour natif reçu** :24/48fps confirmé dans la paire partagée.
+Payload67octets, premier octet0x01 pour les deux; UInt32+40=0x01/0x10;
+second changement à+48=0x01/0x10 (sémantique non isolée, pas de writer déduit).
+Même WAV réel et clip480000→576000samples/96000; sources intactes.
+L'API actuelle affiche24fps pour l'après48fps, et00:00:00:01 à2000samples
+au lieu de00:00:00:02. Autres métadonnées/identités diffèrent également;
+pas de validation de writer par cette paire. Version Pro Tools non fournie.
+Prochaine demande seulement :paire23.976/47.952 réutilisant la base,
+consignes dans `02_23976_vs_47952`. Aucun correctif de code/version/merge.
+
+**Deuxième retour natif reçu** :23.976/47.952fps confirmé, même WAV/piste/clip
+480000→576000samples. Payload67, premier octet0x09 dans les deux;
+UInt32+40=0x09/0x0F; changement également à+48. Le code courant identifie
+l'après comme23.976 et retourne une image au lieu de deux à2002samples/48k.
+Les gardes de création sur enum0x09 restent donc ambiguës avant correction
+du chargeur. Pas de version Pro Tools fournie; sources intactes. Rapport à jour.
+Prochaine demande seulement :une session native59.94DF avec trois marqueurs
+00:01:00;04,00:10:00;00,01:00:00;00. Dossier/consignes `03_5994_df` prêt,
+même base et WAV, pas de nouvelle paire requise. Code API toujours inchangé.
+
+**Troisième retour natif reçu** :59.94DF confirmé,48000Hz; payload67,
+famille+0=0x05, UInt32+40/+48=0x0C. Trois marqueurs :minute1/FF04=2882880,
+minute10/FF00=28799971,heure1/FF00=172799827samples, deux timestamps égaux.
+Ces valeurs corroborent nominal60/cadence60000/1001/quatre labels DF.
+La PR calcule respectivement2884482,28814386,172886314 et dérive de86487samples
+à1h; son erreur n'est pas seulement théorique. Même WAV et clip, source
+intacte. Version Pro Tools non fournie. Prochaine demande seulement :copie
+119.88DF/FF08 àminute1 et mêmes deux autres labels, dans `04_11988_df`.
+Consignes prêtes; aucun correctif de code/version/merge avant intégration.
+
+À la demande du mainteneur, la copie préliminaire du test4 est déjà effectuée
+dans `04_11988_df/native_11988_df` :PTX renommé, Audio Files/cache/backups copiés,
+hashes des fichiers utiles vérifiés et sources intactes. Le PTX copié est
+encore en59.94DF :l'utilisateur doit changer la cadence dans Pro Tools et
+vérifier les trois marqueurs selon les consignes actualisées. Préparer désormais
+les copies préliminaires des prochains tests pour réduire ses manipulations,
+sans écraser une destination contenant déjà du travail utilisateur.
+
+**Quatrième retour natif reçu** :119.88DF confirmé à48kHz, famille0x05,
+UInt32+40/+48=0x13. Payload68octets (fin horaire secondaire à trois chiffres
+d'image), donc ne pas fixer une taille67. Marqueurs minute1/FF08=2882880,
+minute10/FF00=28799971,heure1/FF00=172799827samples, timestamps égaux :
+corroborent nominal120/cadence120000/1001/huit labelsDF. PR :2885282,
+28821593,172929557; erreur129730samples à1h. Même WAV/piste/clip, source
+intacte. SHA PTX d0e3d3df364fe1ea7ee69702559e8631f8bf15877876ce0028e7b80dd23816ee.
+Les quatre contrôles ciblés sont terminés, mais aucune intégration exécutée.
+Point de décision :corriger les quatre historiques+quatre nouvelles cadences
+étayées (huit), ou compléter les11mappings restants avant extension aux19.
+Ne pas annoncer un audit de la table entière clos ni publier les autres cadences
+sans ces preuves. Demander la portée au mainteneur; aucun prochain dossier
+de référence préparé tant que cette portée n'est pas décidée.
+
+**Portée décidée ensuite par le mainteneur :viser les19cadences.** Àsa demande,
+les11copies restantes sont préparées dans `05_remaining_rates_batch`, chacune
+avec le même PTX natif59.94DF/Audio Files/cache, renommée pour sa cible.33fichiers
+utiles vérifiés par SHA, source intacte; aucun champ PTX/API modifié. Les cibles
+sont29.97ND,30ND/DF,50ND,59.94ND,60ND/DF,100ND,119.88ND,120ND/DF.
+Consignes communes et par dossier, suivi et modèle NOTES prêts. Toutes les
+copies restent en59.94DF avant intervention :l'utilisateur doit seulement
+choisir la cadence de session cible, sauver et fermer; ne pas déplacer les
+marqueurs. Les choix absents sont à signaler, pas à substituer. Ce lot corrobore
+les mappings du menu vers les enums; des marqueurs gardés aux mêmes samples
+ne prouvent pas indépendamment toutes les formules temporelles. Ne pas traiter
+une copie non modifiée comme oracle de sa cible ni certifier la table complète
+avant analyse des retours. Aucune intégration/version/tag/release effectuée.
+
 ### Publication v1.6.0 et correction de portabilité CI — 11 octobre 2026
 
 La release v1.6.0 est maintenant publiée. Après publication prématurée avant le
