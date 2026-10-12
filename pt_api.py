@@ -28,7 +28,7 @@ from collections.abc import Mapping
 
 logger = logging.getLogger(__name__)
 
-__version__ = "1.6.1"
+__version__ = "1.6.2"
 
 
 _TEMPLATE_AUDIO_IEEE_FLOAT_SUBFORMAT = bytes.fromhex(
@@ -405,6 +405,37 @@ def _prepare_template_audio_clips(clip_specs, maximum_length_samples=0xFFFFFF):
     if len(set(clip_keys)) != len(clip_keys):
         raise ValueError("Generated clip names must be unique case-insensitively.")
     return prepared, track_names
+
+
+def _chronological_audio_import_placements(prepared):
+    """Order playlist events, retaining IDs and every overlapping-pair priority."""
+    import heapq
+
+    tracks = {}
+    for clip_id, metadata in enumerate(prepared):
+        tracks.setdefault(metadata["track"], []).append((clip_id, metadata))
+    ordered = []
+    for placements in tracks.values():
+        placements = sorted(placements, key=lambda item: item[1]["start_samples"])
+        endings, priorities, active = [], [], set()
+        for clip_id, metadata in placements:
+            start = metadata["start_samples"]
+            # End-exclusive ranges: touching clips do not overlap.
+            while endings and endings[0][0] <= start:
+                _, expired_id = heapq.heappop(endings)
+                active.remove(expired_id)
+            while priorities and -priorities[0] not in active:
+                heapq.heappop(priorities)
+            if priorities and -priorities[0] > clip_id:
+                raise NotImplementedError(
+                    "Chronological audio import would reverse caller priority "
+                    "for overlapping clips on one track."
+                )
+            active.add(clip_id)
+            heapq.heappush(endings, (metadata["end_samples"], clip_id))
+            heapq.heappush(priorities, -clip_id)
+        ordered.extend(placements)
+    return ordered
 
 
 def _wave_pcm_format_signature(stream, chunks, label):
@@ -5440,7 +5471,7 @@ class ProToolsSession:
         name_block.items = [prefix + records + trailer]
 
     def _append_imported_audio_event(self, playlist, clip_id, start_samples):
-        """Append one native audio event in caller-defined spotting order."""
+        """Append one native audio event with the supplied ID and timestamp."""
         if (
             not playlist.items
             or not isinstance(playlist.items[0], (bytes, bytearray))
@@ -5518,6 +5549,8 @@ class ProToolsSession:
                 f"Audio-import target track not found in template: "
                 f"{unknown_tracks[0]!r}."
             )
+        # Validate priority preservation before touching prototypes/catalogs.
+        event_placements = _chronological_audio_import_placements(prepared)
         media_template = copy.deepcopy(template["prototype_media"])
         definition_template = copy.deepcopy(template["prototype_definition"])
         base_filetime = _WINDOWS_FILETIME_EPOCH + time.time_ns() // 100
@@ -5579,7 +5612,7 @@ class ProToolsSession:
         clip_list.items[0] = clip_count
 
         playlists = template["playlists"]
-        for clip_id, metadata in enumerate(prepared):
+        for clip_id, metadata in event_placements:
             self._append_imported_audio_event(
                 playlists[metadata["track"]],
                 clip_id,
@@ -10486,6 +10519,20 @@ def _validate_generated_audio_session(session, prepared, template_tracks):
     """Verify the saved PTX semantically before publishing its directory."""
     if session.get_tracks() != template_tracks:
         raise ValueError("Generated audio session has an unexpected track layout.")
+    expected_events = {track: [] for track in template_tracks}
+    for clip_id, metadata in _chronological_audio_import_placements(prepared):
+        expected_events[metadata["track"]].append((clip_id, metadata["start_samples"]))
+    playlists = session._validated_main_playlists()
+    playlist_names = {id(playlist): name for playlist, name, _ in playlists}
+    actual_events = {name: [] for _, name, _ in playlists}
+    for playlist, _, _, payload in session._validated_main_timeline_events():
+        actual_events[playlist_names[id(playlist)]].append((
+            struct.unpack_from("<I", payload, 2)[0],
+            struct.unpack_from("<Q", payload, 7)[0],
+        ))
+    # get_timeline_clips() sorts its output and cannot verify physical order.
+    if actual_events != expected_events:
+        raise ValueError("Generated audio playlist event order is inconsistent.")
     expected_names = [item["physical_filename"] for item in prepared]
     if session._validated_physical_audio_catalog()[3] != expected_names:
         raise ValueError("Generated physical-media catalog is inconsistent.")
@@ -10554,7 +10601,8 @@ def build_audio_session(
     The source WAV bytes are copied unchanged. The PTX is created from one
     verified template containing exactly one imported prototype in the Clip
     List and empty timeline playlists. Each descriptor supplies audio_path and
-    track_name; its input order defines spotting/overlap priority.
+    track_name. Catalogs/IDs retain input order; playlist events are stable
+    chronological. Reordering must preserve the order of overlapping pairs.
     """
     import shutil
     import tempfile

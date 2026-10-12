@@ -1,6 +1,10 @@
 Thank you to **Damien Zammit and Robin Gareus**, creators of [ptformat](https://github.com/zamaudio/ptformat), for their foundational work on the Pro Tools session format and decryption. Their project was an important reference and inspiration when pt_api began.
 
-# v1.6.1 — Exact frame rates and timecode fixes
+# v1.6.2 — Chronological audio timeline fix
+
+Fixes generated timelines appearing incomplete in Pro Tools when input files are not in chronological order. The builder now sorts playlist events by sample position, preserves catalog IDs and overlap priority, and validates the physical event order. Audio files and clip positions remain unchanged.
+
+## v1.6.1 — Exact frame rates and timecode fixes
 
 Thank you to **[KatzZero (@katzzero)](https://github.com/katzzero)** for the exact-rate field research and proposed 19-rate table.
 
@@ -48,7 +52,7 @@ The table covers the public session, builder, timecode and binary APIs. **Suppor
 | Rename and show template tracks | `rename_track()`, `set_visible_tracks()` | Rename existing verified slots and show the requested selection/display order, hiding the others. No creation or structural reordering of tracks. |
 | Delete template tracks | `delete_tracks()` | Any requested combination in the verified **empty Audio-track pool** profile; every main Audio playlist must be empty and at least one track must remain. Not general populated-track deletion. |
 | Fill missing playlist names | `fill_anonymous_playlist_names()` | Corroborated mono/stereo Audio identities; preserve existing names and all events. Mono AAF-derived output validated in Pro Tools; anonymous stereo composition tested automatically, not manually. |
-| Build an audio session | `build_audio_session()`, `validate_audio_import_template()` | Populate existing empty template tracks, create catalogs/placements and copy source WAVs unchanged. Two strict mono float32 / 48 kHz / 23.976 template profiles; valid BWF metadata required. |
+| Build an audio session | `build_audio_session()`, `validate_audio_import_template()` | Populate existing empty template tracks, create catalogs/placements and copy source WAVs unchanged. Two strict mono float32 / 48 kHz / 23.976 profiles; valid BWF required. Stable chronological playlist order, caller catalog/ID order preserved; conflicting overlap priorities rejected. |
 | Import native audio | `import_audio()` | Append a full native mono PCM24 / 48 kHz WAV using an explicit compatible parent prototype. Session must be 48 kHz / 23.976; WAV already in its `Audio Files` directory, with required native metadata. No copy or conversion. |
 | Preflight and relink media | `get_relink_write_status()`, `relink_clip()` | Check a specific placement, then clone compatible native WAV/media/clip identities and retarget only that placement. Optional compatible rendered PCM replacement; known unwritable inherited-media layouts are rejected. |
 | Rename, mute, move and duplicate audio | `rename_clip()`, `mute_clip()`, `move_clip()`, `duplicate_clip()` | Exact, unambiguous audio targets. Mute affects all visible placements of that definition; move/duplicate require one placement and reject attached fades. Not Clip Group macro editing. |

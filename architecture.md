@@ -1,4 +1,4 @@
-# Architecture logicielle de `pt_api` 1.6.1
+# Architecture logicielle de `pt_api` 1.6.2
 
 Ce document donne un survol global du logiciel. Les structures binaires, offsets, flags et messages d'erreur appartiennent à [`pt_format_specs.md`](pt_format_specs.md), qui est la spécification technique normative. La surface publique et ses limitations sont résumées dans [`README.md`](README.md).
 
@@ -72,7 +72,7 @@ template.ptx + manifeste ordonné de WAV/pistes
     → validation complète du template, des descripteurs et des WAV
     → conservation de l'ordre fourni par le client
     → remplacement/clonage du média-prototype et des définitions de clips
-    → spotting BWF ou explicite dans les pistes existantes, overlap conservé
+    → spotting BWF ou explicite, ordre chronologique avec priorités d'overlap conservées
     → copie byte-for-byte des WAV dans Audio Files
     → sauvegarde puis rechargement sémantique du PTX temporaire
     → renommage atomique du dossier de session complet
@@ -606,7 +606,7 @@ Le profil d'écriture est choisi une seule fois depuis le prototype du template,
 
 La séparation des responsabilités est stricte :
 
-- le client décide de l'ordre, de la piste cible, du nom de clip et, facultativement, du filename livré;
+- le client décide de l'ordre du manifeste/catalogues/IDs, de la piste cible, du nom de clip et, facultativement, du filename livré; le builder écrit séparément les événements chronologiquement;
 - le BWF décide de la référence média et du timestamp de placement par défaut;
 - un override explicite décide uniquement du timestamp de l'événement, sans falsifier la référence BWF;
 - le chunk `data` décide de la durée;
@@ -614,6 +614,8 @@ La séparation des responsabilités est stricte :
 - le template fournit exclusivement les structures opaques et constantes déjà produites par Pro Tools.
 
 Les WAV livrés ne sont jamais réencodés ni enrichis par l'API. Ils sont copiés tels quels; les blocs `DGDA`, `minf` et `regn` ajoutés par Pro Tools ne sont pas reproduits par supposition.
+
+Depuis1.6.2 : `_chronological_audio_import_placements()` prépare les placements par piste avant toute mutation. Le tri par sample de départ est stable, conserve les IDs de catalogue et est accepté seulement s'il conserve l'ordre relatif des paires qui se chevauchent. Deux heaps et un ensemble d'événements actifs détectent les conflits en O(N log N), sans limiter le nombre de médias. `_validate_generated_audio_session()` confronte ensuite les IDs/timestamps dans les slots physiques de playlist à cet ordre attendu, car le lecteur public trie déjà ses résultats. Le helper d'append reste utilisé sans modification d'ordre par l'import PCM24; ce correctif ne normalise pas toutes les sessions dans `save()`.
 
 Le relink physique suit le même principe de conservatisme : il ne reconstruit pas une géométrie audio. Sur un catalogue natif vérifié, il clone et retargete les layouts de production parent/virtuel `0x0000`, `0x0001`, `0x2000`, `0x2001`, `0x3000`, `0x3001` et `0x4001` en conservant leur flag et leur largeur d'offset source. La variante native Pro Tools/RX `0x3000 / 0x20 / 0x44 / 0x08` est également prise en charge avec son équation de référence incorporée vérifiée. Le préflight partage le validateur de géométrie du writer et ne déclare donc pas compatible un layout qu'il refuserait. Les headers virtuels Premiere à longueur variable restent explicitement bloqués; ils ne sont pas convertis heuristiquement.
 

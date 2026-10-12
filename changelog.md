@@ -1,6 +1,15 @@
 # Pro Tools API - Changelog
 
-## v1.6.1 — cadences exactes et Drop Frame (publication en préparation)
+## v1.6.2 — ordre chronologique des événements du builder
+
+- **12 octobre 2026** : un lot réel de131 placements contient quatre retours temporels en arrière dans l'ordre physique de sa playlist. Pro Tools affiche une timeline arrêtée à la fin du dernier événement écrit, même si le lecteur API trié retrouve tous les clips. Le candidat réordonné ne change que0x1054 et fonctionne; sa sauvegarde native conserve les plages/médias/mute et passe deux cycles API byte-identiques.
+- Le builder sépare désormais ordre du manifeste/catalogues/IDs et ordre stable chronologique des événements, piste par piste. Aucun tri par nom, seuil de99 ou règle d'application cliente. Aucun changement de WAV, placement, durée ou ID.
+- `_chronological_audio_import_placements()` vérifie avant mutation que le tri conserve l'ordre relatif de toutes les paires qui se chevauchent; intervalles de fin exclusive, égalités de départ stables, pistes indépendantes. Seul un conflit réel de priorité de chevauchement est refusé explicitement; les overlaps déjà compatibles restent acceptés.
+- Le validateur de sortie vérifie les tuples ID/timestamp dans l'ordre physique, sans se fier au tri du reader. Neuf régressions ajoutées, incluant le lot natif131, le refus d'une sortie mal ordonnée pourtant identique au niveau du reader et la sauvegarde native de la sortie construite par le code corrigé.
+- Construction complète du même lot avec le code corrigé :131 WAV byte-identiques, catalogues conservés, événements chronologiques, fin10:43:03:10. Le mainteneur confirme cette nouvelle sortie dans Pro Tools; sa sauvegarde native conserve les131 placements, passe deux cycles API byte-identiques et préserve les131 chunks audio data/fmt malgré l'enrichissement des métadonnées WAV. Le correctif ne change pas `save()` globalement et n'élargit pas `import_audio()`.
+- Suite locale : **664 tests réussis** avec les références privées. Versions source/paquet harmonisées à1.6.2 pour la publication par le mainteneur; aucune modification de tag, commit/push ou publication par l'agent.
+
+## v1.6.1 — cadences exactes et Drop Frame
 
 - **11 octobre 2026** : adaptation locale de la contribution de KatzZero (@katzzero, PR #2), sans merge automatique de la branche obsolète. Lecture du UInt32 complet à +40 de `0x204d`; rejet des payloads tronqués, conservation des champs opaques et des enums inconnus sans fallback vers la famille.
 - Table de 19 cadences exactes; Drop Frame corrigé à 2/4/8 numéros omis pour les nominals 30/60/120. Les variantes entières et fractionnaires restent distinctes. Validation temporelle de move/split cohérente avec le moteur, y compris la dernière image nominale.
