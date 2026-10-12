@@ -41,6 +41,7 @@ dist/
 # Local native builder-template fixtures (kept outside the published repository)
 /tests/fixtures/timecode_exact_rates/
 /tests/fixtures/audio_import_event_order/
+/tests/fixtures/audio_sync_point/
 /tests/fixtures/walla_template_native_float_31_151.ptx
 /tests/fixtures/walla_template_native_float_31_151_u32.ptx
 /tests/fixtures/native_90_tracks.ptx

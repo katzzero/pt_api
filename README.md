@@ -1,6 +1,10 @@
 Thank you to **Damien Zammit and Robin Gareus**, creators of [ptformat](https://github.com/zamaudio/ptformat), for their foundational work on the Pro Tools session format and decryption. Their project was an important reference and inspiration when pt_api began.
 
-# v1.6.2 — Chronological audio timeline fix
+# v1.6.3 — Sync Point and fade reading fixes
+
+Fixes timeline reading for supported Sync Points and compact post-splice crossfades, while preserving unused fade definitions and keeping editing safeguards unchanged.
+
+## v1.6.2 — Chronological audio timeline fix
 
 Fixes generated timelines appearing incomplete in Pro Tools when input files are not in chronological order. The builder now sorts playlist events by sample position, preserves catalog IDs and overlap priority, and validates the physical event order. Audio files and clip positions remain unchanged.
 

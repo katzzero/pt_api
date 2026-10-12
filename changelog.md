@@ -1,5 +1,17 @@
 # Pro Tools API - Changelog
 
+## v1.6.3 — lecture des Sync Points et fades compacts
+
+- Catalogue de fades : le reader de timeline accepte des définitions inutilisées tout en validant le compteur, les payloads et les IDs placés uniques. Aucune ligne fictive, suppression ou compaction du catalogue. Le validateur par défaut utilisé par les writers reste strict.
+- Cinq régressions de catalogue inutilisé ajoutées :682 tests réussis avec le corpus local, incluant la conservation byte-identique du PTX natif avec Sync Point.
+- Capture native suivante : début/fin/durée d'un crossfade compact corroborent son départ à l'ancre, sans pré-roll. Le profil32 octets Equal Power est maintenant lu strictement (header, mode/forme, padding et durée positive), sans masquer des nibbles ou accepter toutes les formes. Sept régressions supplémentaires; la référence native retourne14 placements audio et13 fades, y compris les quatre compacts. Les writers temporels refusent les deux côtés d'un compact, même sans flag de lien; aucune écriture de ce profil ni validation de rendu applicatif n'est annoncée.
+- Suite locale complète après intégration :689 tests réussis. Le lecteur complet et les cycles byte-identiques sont également vérifiés sur le PTX natif courant; le support reste limité aux profils décrits, sans nouvelle garantie universelle de rendu par un programme client.
+
+- Lecture strictement ajoutée pour `0x3000 / 0x22 / 0x44 / 0x08` : offset source UInt24, déplacement Sync Point UInt16, durée UInt16. Le début audible est l'ancre de timeline moins ce déplacement; l'offset source n'est pas corrigé artificiellement.
+- Association des fades aux bornes audibles, conservation des octets natifs et de la structure publique des résultats. Les autres familles de sélecteurs avec bits bas non nuls restent refusées.
+- Éditions de géométrie et gain sur ce profil explicitement refusées avant mutation; précontrôle relink négatif. Renommage/mute ne touchent pas aux champs de Sync Point.
+- Régressions synthétiques et référence native privée : bornes corroborées par la capture Pro Tools, unsigned/limites/troncatures, occurrences répétées, association des fades et cycle de sauvegarde byte-identique. Les fades non vérifiés restent bloquants; aucune validation d'import complet ni nouvelle version publiée n'est annoncée.
+
 ## v1.6.2 — ordre chronologique des événements du builder
 
 - **12 octobre 2026** : un lot réel de131 placements contient quatre retours temporels en arrière dans l'ordre physique de sa playlist. Pro Tools affiche une timeline arrêtée à la fin du dernier événement écrit, même si le lecteur API trié retrouve tous les clips. Le candidat réordonné ne change que0x1054 et fonctionne; sa sauvegarde native conserve les plages/médias/mute et passe deux cycles API byte-identiques.

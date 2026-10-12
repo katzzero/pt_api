@@ -28,7 +28,7 @@ from collections.abc import Mapping
 
 logger = logging.getLogger(__name__)
 
-__version__ = "1.6.2"
+__version__ = "1.6.3"
 
 
 _TEMPLATE_AUDIO_IEEE_FLOAT_SUBFORMAT = bytes.fromhex(
@@ -3017,6 +3017,16 @@ class ProToolsSession:
             0x30: 3,
             0x40: 4,
         }
+        # Native Sync Point profile: UInt24 source, UInt16 sync displacement,
+        # UInt16 length. The timeline timestamp is the sync anchor, not start.
+        # Do not mask selector bits: other sync geometries remain unverified.
+        has_sync_point = width_selector == 0x22
+        if has_sync_point:
+            if (flags != 0x3000
+                    or bytes(payload[attribute_offset + 3:attribute_offset + 5])
+                    != b"\x44\x08"):
+                raise ValueError("Unsupported 0x2628 Sync Point layout.")
+            width_by_selector[0x22] = 2
         if width_selector not in width_by_selector:
             raise ValueError(
                 f"Unsupported 0x2628 width selector: 0x{width_selector:02x}."
@@ -3039,23 +3049,40 @@ class ProToolsSession:
         source_width = source_width_by_flags[flags]
         length_width = width_by_selector[width_selector]
         fields_offset = attribute_offset + 5
-        fields_end = fields_offset + source_width + length_width
+        sync_width = 2 if has_sync_point else 0
+        fields_end = fields_offset + source_width + sync_width + length_width
         if fields_end > len(payload):
             raise ValueError("Truncated source-offset/length clip payload.")
         source_offset = int.from_bytes(
             payload[fields_offset:fields_offset + source_width], "little"
         ) if source_width else 0
-        length_offset = fields_offset + source_width
+        sync_offset = int.from_bytes(
+            payload[fields_offset + source_width:fields_offset + source_width + sync_width],
+            "little",
+        ) if has_sync_point else 0
+        length_offset = fields_offset + source_width + sync_width
         length = int.from_bytes(
             payload[length_offset:length_offset + length_width], "little"
         )
 
-        return {
+        info = {
             "name": name,
             "flags": flags,
             "length": length,
             "src_offset": source_offset,
         }
+        if has_sync_point:
+            info["sync_offset"] = sync_offset
+        return info
+
+    @staticmethod
+    def _audio_placement_start(payload, clip_info):
+        """Resolve the audible start without changing the raw sync anchor."""
+        anchor = struct.unpack_from("<Q", payload, 7)[0]
+        start = anchor - clip_info.get("sync_offset", 0)
+        if start < 0:
+            raise ValueError("Audio Sync Point placement starts before sample zero.")
+        return start
 
     def _decode_clip_group_payload(self, payload):
         """Decode the verified 0x5000 Clip Group 0x2628 layout."""
@@ -3565,7 +3592,9 @@ class ProToolsSession:
 
         events = self._validated_main_timeline_events(allow_anonymous=True)
         if include_fades:
-            _, _, fade_bindings = self._validated_fade_geometry_bindings(events)
+            _, _, fade_bindings = self._validated_fade_geometry_bindings(
+                events, allow_unused=True
+            )
             geometry_by_event = {
                 id(entry[1]): geometry
                 for entry, _, geometry in fade_bindings
@@ -3612,7 +3641,7 @@ class ProToolsSession:
                 # Keep the reader observational: ignore it here and preserve
                 # its raw event unchanged for a later no-op save.
                 continue
-            start = struct.unpack_from("<Q", payload, 7)[0]
+            start = self._audio_placement_start(payload, clip_dict[clip_id])
             audio_placements.append({
                 "playlist": playlist,
                 "event": event,
@@ -3679,9 +3708,15 @@ class ProToolsSession:
                         if placement["playlist"] is playlist
                         and placement["end"] == anchor_timestamp
                     ]
-                elif geometry_length == 34:
-                    pre_roll = struct.unpack_from("<H", geometry_payload, 8)[0]
-                    length_samples = struct.unpack_from("<H", geometry_payload, 10)[0]
+                elif geometry_length in (32, 34):
+                    if geometry_length == 32:
+                        pre_roll = 0
+                        length_samples = self._decode_compact_post_crossfade_length(
+                            geometry_payload
+                        )
+                    else:
+                        pre_roll = struct.unpack_from("<H", geometry_payload, 8)[0]
+                        length_samples = struct.unpack_from("<H", geometry_payload, 10)[0]
                     if pre_roll > anchor_timestamp:
                         raise ValueError("Crossfade starts before sample zero.")
                     start_samples = anchor_timestamp - pre_roll
@@ -4533,6 +4568,16 @@ class ProToolsSession:
             raise ValueError("Invalid 0x2629 clip definition.")
         return self._decode_audio_clip_payload(payload_blocks[0].items[0])
 
+    def _editable_audio_clip_info_by_id(self, clip_id):
+        """Keep newly decoded Sync Point geometry out of unverified writers."""
+        info = self._audio_clip_info_by_id(clip_id)
+        if "sync_offset" in info:
+            raise NotImplementedError(
+                "Editing the 0x22 audio Sync Point layout is not verified; "
+                "this profile is supported for reading only."
+            )
+        return info
+
     def _validated_main_timeline_events(self, allow_anonymous=False):
         """Return validated direct events from the visible 0x1054 playlists."""
         timeline_events = []
@@ -4644,13 +4689,18 @@ class ProToolsSession:
             raise ValueError("Invalid 0x262f fade geometry payload.")
         return geometry_root, geometries
 
-    def _validated_fade_geometry_bindings(self, timeline_events=None):
+    def _validated_fade_geometry_bindings(self, timeline_events=None, *, allow_unused=False):
         """Bind each fade event to the 0x262f index stored in 0x104f +2.
 
         Fade and audio events reuse the same four-byte field at +2, but they
         use different namespaces: audio values index 0x262a clip definitions,
         while fade values index the global 0x2630 geometry list.
+        The observational reader may preserve unused catalogue entries.
+        Writers retain the strict one-to-one contract by default; allowing
+        unused entries does not allow repeated or out-of-range references.
         """
+        if not isinstance(allow_unused, bool):
+            raise TypeError("allow_unused must be a boolean.")
         if timeline_events is None:
             timeline_events = self._validated_main_timeline_events()
         fade_entries = [
@@ -4661,7 +4711,7 @@ class ProToolsSession:
             return None, [], []
 
         geometry_root, geometries = self._validated_fade_geometry_list()
-        if len(fade_entries) != len(geometries):
+        if not allow_unused and len(fade_entries) != len(geometries):
             raise ValueError("Fade event and 0x262f geometry counts do not match.")
 
         bindings = []
@@ -4678,6 +4728,19 @@ class ProToolsSession:
             bindings.append((entry, geometry_id, geometries[geometry_id]))
 
         return geometry_root, geometries, bindings
+
+    @staticmethod
+    def _decode_compact_post_crossfade_length(payload):
+        """Read the native UInt16 post-splice Equal Power profile, not write it."""
+        if (len(payload) != 32
+                or bytes(payload[:8]) != b"\x00\x00\x00\x00\x00\x20\x00\x00"
+                or bytes(payload[10:12]) != b"\x01\x01"
+                or bytes(payload[12:]) != bytes(20)):
+            raise ValueError("Unsupported 0x262f compact Post Crossfade layout.")
+        length = struct.unpack_from("<H", payload, 8)[0]
+        if length == 0:
+            raise ValueError("Compact Post Crossfade duration must be positive.")
+        return length
 
     @staticmethod
     def _decode_fade_out_length(payload):
@@ -4711,6 +4774,11 @@ class ProToolsSession:
                 raise ValueError("Invalid 0x262f fade geometry payload.")
             geometry_length = len(geometry.items[0])
             anchor = struct.unpack_from("<Q", entry[3], 7)[0]
+            if geometry_length == 32 and anchor in (start_samples, end_samples):
+                raise NotImplementedError(
+                    "Editing audio attached to a compact 32-byte crossfade "
+                    "is not verified."
+                )
             is_related = (
                 (geometry_length == 22 and anchor == start_samples)
                 or (geometry_length in (26, 27, 29) and anchor == end_samples)
@@ -4758,7 +4826,7 @@ class ProToolsSession:
         if payload[33] != 0:
             raise NotImplementedError("Deleting a clip linked to a crossfade is not supported safely.")
         start = struct.unpack_from("<Q", payload, 7)[0]
-        length = self._audio_clip_info_by_id(clip_id)["length"]
+        length = self._editable_audio_clip_info_by_id(clip_id)["length"]
         end = start + length
         if length <= 0 or end > 0xffffffffffffffff:
             raise ValueError("Invalid clip-deletion placement bounds.")
@@ -4786,9 +4854,16 @@ class ProToolsSession:
             duration = self._decode_fade_out_length(geom.items[0])
             if duration > length:
                 raise ValueError("Attached fade-out exceeds the deleted clip.")
-            owners = [item for item in audio if item[0] is playlist
-                      and struct.unpack_from("<Q", item[3], 7)[0]
-                      + self._audio_clip_info_by_id(struct.unpack_from("<I", item[3], 2)[0])["length"] == end]
+            owners = []
+            for item in audio:
+                if item[0] is not playlist:
+                    continue
+                owner_info = self._audio_clip_info_by_id(
+                    struct.unpack_from("<I", item[3], 2)[0]
+                )
+                owner_start = self._audio_placement_start(item[3], owner_info)
+                if owner_start + owner_info["length"] == end:
+                    owners.append(item)
             if len(owners) != 1:
                 raise ValueError("Attached fade-out ownership is ambiguous.")
             if (len(entry[3]) != 35 or entry[3][33] != 0
@@ -4887,6 +4962,7 @@ class ProToolsSession:
 
         region_id = self._resolve_unique_clip_id(clip_name)
         timeline_events = self._validated_main_timeline_events()
+        clip_info = self._editable_audio_clip_info_by_id(region_id)
         placements = []
         for entry in timeline_events:
             _, event, _, payload = entry
@@ -4906,7 +4982,7 @@ class ProToolsSession:
         original_start = struct.unpack_from("<Q", target_original_payload, 7)[0]
         has_fade_events = any(entry[3][15] == 0x01 for entry in timeline_events)
         if has_fade_events:
-            clip_length = self._audio_clip_info_by_id(region_id)["length"]
+            clip_length = clip_info["length"]
             related_fades = self._fade_bindings_for_audio_placement(
                 original_start, clip_length, target_playlist, timeline_events
             )
@@ -6303,7 +6379,7 @@ class ProToolsSession:
         target_audio = target_audio_matches[0]
         target_audio_payload = direct_blocks(target_audio, 0x104f)[0].items[0]
         source_clip_id = struct.unpack_from("<I", target_audio_payload, 2)[0]
-        source_clip = self._audio_clip_info_by_id(source_clip_id)
+        source_clip = self._editable_audio_clip_info_by_id(source_clip_id)
         duration = source_clip["length"]
         if not duration:
             raise ValueError("The source audio placement has zero duration.")
@@ -7543,7 +7619,7 @@ class ProToolsSession:
         if len(source_payload) != 35:
             raise ValueError("Audio event 0x104f payload must be exactly 35 bytes.")
         source_start = struct.unpack_from("<Q", source_payload, 7)[0]
-        source_length = self._audio_clip_info_by_id(clip_id)["length"]
+        source_length = self._editable_audio_clip_info_by_id(clip_id)["length"]
         related_fades = self._fade_bindings_for_audio_placement(
             source_start, source_length, target_b1052, timeline_events
         )
@@ -8164,16 +8240,7 @@ class ProToolsSession:
 
         # 2. Resolve the parent clip ID and its duration.
         clip_id = self._resolve_unique_clip_id(clip_name)
-        clip_roots = self._root_blocks(0x262a)
-        clip_definitions = [
-            item for item in clip_roots[0].items
-            if isinstance(item, PTBlock) and item.content_type == 0x2629
-        ]
-        clip_payload_block = next(
-            item for item in clip_definitions[clip_id].items
-            if isinstance(item, PTBlock) and item.content_type == 0x2628
-        )
-        clip_info = self._decode_audio_clip_payload(clip_payload_block.items[0])
+        clip_info = self._editable_audio_clip_info_by_id(clip_id)
         clip_length = clip_info["length"]
         if clip_length <= 0:
             raise ValueError(f"Clip '{clip_name}' has no positive duration.")
@@ -8228,6 +8295,14 @@ class ProToolsSession:
         _, _, existing_fade_bindings = self._validated_fade_geometry_bindings(
             timeline_events
         )
+        for entry, _, geometry in existing_fade_bindings:
+            if (entry[0] is b1052 and len(geometry.items[0]) == 32
+                    and struct.unpack_from("<Q", entry[3], 7)[0]
+                    in (event_start, event_end)):
+                raise NotImplementedError(
+                    "Editing audio attached to a compact 32-byte crossfade "
+                    "is not verified."
+                )
         expected_geometry_lengths = (22,) if fade_type == "in" else (26, 27, 29)
         if any(
             entry[0] is b1052
@@ -8413,6 +8488,7 @@ class ProToolsSession:
             raise ValueError("Clip Gain exceeds the Float32 range.") from exc
 
         target_clip_id = self._resolve_unique_clip_id(clip_name)
+        self._editable_audio_clip_info_by_id(target_clip_id)
         b262a = self._root_blocks(0x262a)[0]
         definitions = [
             child for child in b262a.items
@@ -10045,6 +10121,8 @@ class ProToolsSession:
         if orig_clip_id < 0 or orig_clip_id >= len(clips):
             raise ValueError(f"Unknown original clip ID {orig_clip_id}.")
 
+        self._editable_audio_clip_info_by_id(orig_clip_id)
+
         existing_names = {
             self._audio_clip_info_by_id(clip_id)["name"]
             for clip_id in range(len(clips))
@@ -10171,7 +10249,7 @@ class ProToolsSession:
         if (len(event_payload) != 35 or event_payload[33] != 0
                 or not isinstance(event_block.items, list)):
             raise ValueError("Unsupported in-place trim audio event profile.")
-        info = self._audio_clip_info_by_id(clip_id)
+        info = self._editable_audio_clip_info_by_id(clip_id)
         start = struct.unpack_from("<Q", event_payload, 7)[0]
         end = start + info["length"]
         if not start < cut_samples < end:
@@ -10274,7 +10352,7 @@ class ProToolsSession:
                 or len(event_payload) != 35 or event_payload[33] != 0
                 or bytes(event.items[1]) != b"\x00\x01\x01"):
             raise ValueError("Unsupported region-retention event profile.")
-        info = self._audio_clip_info_by_id(clip_id)
+        info = self._editable_audio_clip_info_by_id(clip_id)
         old_start = struct.unpack_from("<Q", event_payload, 7)[0]
         old_end = old_start + info["length"]
         if not 0 <= old_start < old_end <= 0xffffffff:
@@ -10287,8 +10365,9 @@ class ProToolsSession:
         for entry in entries:
             if (entry[0] is playlist and entry[1] is not event
                     and self._audio_timeline_event_kind(entry[1], entry[3]) == "audio"):
-                other_start = struct.unpack_from("<Q", entry[3], 7)[0]
-                other_length = self._audio_clip_info_by_id(struct.unpack_from("<I", entry[3], 2)[0])["length"]
+                other_info = self._audio_clip_info_by_id(struct.unpack_from("<I", entry[3], 2)[0])
+                other_start = self._audio_placement_start(entry[3], other_info)
+                other_length = other_info["length"]
                 if other_start < old_end and old_start < other_start + other_length:
                     raise ValueError("Keeping regions does not support overlapping audio placements.")
         clip_list = self._root_blocks(0x262a)[0]
@@ -10408,7 +10487,7 @@ class ProToolsSession:
         original_removed_offsets = list(getattr(self, '_removed_offsets', []))
         try:
             clip_id = self._resolve_unique_clip_id(clip_name)
-            clip_info = self._audio_clip_info_by_id(clip_id)
+            clip_info = self._editable_audio_clip_info_by_id(clip_id)
             if amount_samples >= clip_info["length"]:
                 raise ValueError("Trim amount must be smaller than the clip length.")
 

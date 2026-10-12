@@ -1,6 +1,10 @@
-# Architecture logicielle de `pt_api` 1.6.2
+# Architecture logicielle de `pt_api` 1.6.3
 
 Ce document donne un survol global du logiciel. Les structures binaires, offsets, flags et messages d'erreur appartiennent à [`pt_format_specs.md`](pt_format_specs.md), qui est la spécification technique normative. La surface publique et ses limitations sont résumées dans [`README.md`](README.md).
+
+Depuis1.6.3 : le décodeur audio reconnaît un profil natif de Sync Point. `_audio_placement_start()` convertit l'ancre brute en début audible avant l'association des fades, sans modifier le PTX ni l'offset dans le média. `_editable_audio_clip_info_by_id()` maintient la séparation lecture/écriture et refuse ce profil dans les writers de géométrie et de gain; le précontrôle relink reste négatif. Renommage et mute restent indépendants de cette géométrie. Les autres profils de géométrie, les signatures publiques et le validateur Volume ne sont pas élargis.
+
+Lecture des fades : le seul appel public de timeline utilise désormais le mode privé `allow_unused=True` du résolveur de liens. Il valide le catalogue et les IDs des occurrences placées mais ne confond pas définition inutilisée et événement visible. Le mode par défaut utilisé par les writers conserve sa bijection stricte. Le décodeur strict `_decode_compact_post_crossfade_length()` lit le profil32 octets Post Crossfade Equal Power : pré-roll nul, durée UInt16, début à l'ancre. Aucun nouveau writer de fade n'est autorisé; les writers temporels refusent une cible adjacente à cette géométrie avant mutation, indépendamment du flag de lien d'événement.
 
 ## Objectif et périmètre
 

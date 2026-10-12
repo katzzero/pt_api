@@ -334,7 +334,7 @@ class TimelineReadTests(unittest.TestCase):
             [],
         )
 
-        with self.assertRaisesRegex(ValueError, "geometry counts do not match"):
+        with self.assertRaisesRegex(ValueError, "unknown geometry ID"):
             session.get_timeline_clips()
 
     def test_audio_only_read_skips_unneeded_fade_validation(self):
